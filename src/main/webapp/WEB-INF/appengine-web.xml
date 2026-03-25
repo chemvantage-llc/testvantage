@@ -3,19 +3,13 @@
     <application>test-vantage</application>
     <version>1</version>
     <threadsafe>true</threadsafe>
-    <runtime>java11</runtime>
+    <runtime>java17</runtime>
 
     <system-properties>
         <property name="java.util.logging.config.file" value="WEB-INF/logging.properties"/>
     </system-properties>
 
     <sessions-enabled>true</sessions-enabled>
-    <session-config>
-        <cookie-config>
-            <http-only>true</http-only>
-            <secure>true</secure>
-        </cookie-config>
-    </session-config>
 
     <env-variables>
         <env-var name="CHEMVANTAGE_URL" value="https://www.chemvantage.org"/>
