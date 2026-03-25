@@ -1,0 +1,18 @@
+runtime: java11
+instance_class: F2
+
+entrypoint: 'java -Xmx256m -jar /workspace/target/test-vantage-1.0-SNAPSHOT.jar'
+
+automatic_scaling:
+  target_cpu_utilization: 0.65
+  min_instances: 0
+  max_instances: 10
+
+env_variables:
+  CHEMVANTAGE_URL: 'https://www.chemvantage.org'
+
+handlers:
+- url: /.*
+  script: auto
+  secure: always
+  redirect_http_response_code: 301
