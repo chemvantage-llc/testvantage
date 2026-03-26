@@ -1,38 +1,43 @@
 package org.testvantage;
 
 import com.google.gson.Gson;
+import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
+import com.google.api.client.http.GenericUrl;
+import com.google.api.client.http.HttpRequest;
+import com.google.api.client.http.HttpRequestFactory;
+import com.google.api.client.http.HttpResponse;
+import com.google.api.client.http.HttpTransport;
+import com.google.api.client.http.javanet.NetHttpTransport;
+import com.google.api.client.http.json.JsonHttpContent;
+import com.google.api.client.json.gson.GsonFactory;
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.io.PrintWriter;
-import java.util.*;
 
 /**
  * Handles LTI 1.3 Dynamic Registration
+ * This platform initiates registration with the tool (ChemVantage)
  */
 public class RegistrationServlet extends HttpServlet {
     
     private static final Gson gson = new Gson();
+    private static final HttpTransport HTTP_TRANSPORT = new NetHttpTransport();
     
     @Override
     protected void doGet(HttpServletRequest req, HttpServletResponse resp) 
             throws ServletException, IOException {
         
         String action = req.getParameter("action");
-        String openid_configuration = req.getParameter("openid_configuration");
-        String registration_token = req.getParameter("registration_token");
         
         if ("start".equals(action)) {
-            // Display registration initiation page
-            displayRegistrationStart(req, resp);
-        } else if (openid_configuration != null) {
-            // Handle registration request from tool
-            handleRegistrationRequest(req, resp, openid_configuration, registration_token);
+            // Display registration form
+            displayRegistrationForm(req, resp);
         } else {
-            resp.sendError(HttpServletResponse.SC_BAD_REQUEST, "Missing required parameters");
+            resp.sendRedirect("/?action=start");
         }
     }
     
@@ -40,90 +45,201 @@ public class RegistrationServlet extends HttpServlet {
     protected void doPost(HttpServletRequest req, HttpServletResponse resp) 
             throws ServletException, IOException {
         
-        // Handle registration submission from tool
-        String contentType = req.getContentType();
-        if (contentType != null && contentType.contains("application/json")) {
-            handleToolRegistration(req, resp);
-        } else {
-            resp.sendError(HttpServletResponse.SC_BAD_REQUEST, "Expected application/json");
+        String toolRegistrationUrl = req.getParameter("registration_url");
+        
+        if (toolRegistrationUrl == null || toolRegistrationUrl.isEmpty()) {
+            resp.sendError(HttpServletResponse.SC_BAD_REQUEST, "Missing registration_url parameter");
+            return;
+        }
+        
+        // Perform registration with the tool
+        performRegistration(req, resp, toolRegistrationUrl);
+    }
+    
+    private void displayRegistrationForm(HttpServletRequest req, HttpServletResponse resp) 
+            throws IOException {
+        resp.setContentType("text/html");
+        PrintWriter out = resp.getWriter();
+        
+        String baseUrl = req.getScheme() + "://" + req.getServerName() 
+                + (req.getServerPort() != 80 && req.getServerPort() != 443 ? ":" + req.getServerPort() : "");
+        
+        out.println("<!DOCTYPE html><html><head>");
+        out.println("<title>LTI Dynamic Registration</title>");
+        out.println("<style>");
+        out.println("body { font-family: Arial, sans-serif; max-width: 800px; margin: 50px auto; padding: 20px; }");
+        out.println("h1 { color: #333; }");
+        out.println(".form-group { margin: 20px 0; }");
+        out.println("label { display: block; margin-bottom: 5px; font-weight: bold; }");
+        out.println("input[type='text'] { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px; }");
+        out.println("button { background: #4CAF50; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; }");
+        out.println("button:hover { background: #45a049; }");
+        out.println(".info { background: #d1ecf1; border: 1px solid #bee5eb; padding: 15px; border-radius: 5px; margin: 20px 0; }");
+        out.println("</style>");
+        out.println("</head><body>");
+        
+        out.println("<h1>Dynamic Registration with ChemVantage</h1>");
+        out.println("<p>This will register Test Vantage as a platform with ChemVantage.</p>");
+        
+        out.println("<div class='info'>");
+        out.println("<strong>Platform Information:</strong><br>");
+        out.println("Issuer: " + baseUrl + "<br>");
+        out.println("JWKS URI: " + baseUrl + "/jwks<br>");
+        out.println("Auth Endpoint: " + baseUrl + "/oidc/auth<br>");
+        out.println("Token Endpoint: " + baseUrl + "/oauth2/token");
+        out.println("</div>");
+        
+        out.println("<form method='POST' action='/registration'>");
+        out.println("<div class='form-group'>");
+        out.println("<label for='registration_url'>ChemVantage Registration URL:</label>");
+        out.println("<input type='text' id='registration_url' name='registration_url' ");
+        out.println("placeholder='https://www.chemvantage.org/lti/registration' required>");
+        out.println("</div>");
+        out.println("<button type='submit'>Register Platform</button>");
+        out.println("<a href='/' style='margin-left: 10px;'>Cancel</a>");
+        out.println("</form>");
+        
+        out.println("</body></html>");
+    }
+    
+    private void performRegistration(HttpServletRequest req, HttpServletResponse resp,
+                                     String toolRegistrationUrl) throws IOException {
+        
+        String baseUrl = req.getScheme() + "://" + req.getServerName() 
+                + (req.getServerPort() != 80 && req.getServerPort() != 443 ? ":" + req.getServerPort() : "");
+        
+        // Build registration request payload
+        JsonObject registrationRequest = new JsonObject();
+        registrationRequest.addProperty("application_type", "web");
+        registrationRequest.addProperty("grant_types", "client_credentials,implicit");
+        registrationRequest.addProperty("response_types", "id_token");
+        registrationRequest.addProperty("client_name", "Test Vantage LMS");
+        registrationRequest.addProperty("client_uri", baseUrl);
+        registrationRequest.addProperty("logo_uri", baseUrl + "/logo.png");
+        registrationRequest.addProperty("tos_uri", baseUrl + "/tos");
+        registrationRequest.addProperty("policy_uri", baseUrl + "/policy");
+        registrationRequest.addProperty("jwks_uri", baseUrl + "/jwks");
+        registrationRequest.addProperty("token_endpoint_auth_method", "private_key_jwt");
+        
+        JsonArray redirectUris = new JsonArray();
+        redirectUris.add(baseUrl + "/oidc/auth");
+        registrationRequest.add("redirect_uris", redirectUris);
+        
+        JsonArray scopes = new JsonArray();
+        scopes.add("openid");
+        registrationRequest.addProperty("scope", "openid");
+        
+        // LTI-specific claims
+        JsonObject ltiToolConfiguration = new JsonObject();
+        ltiToolConfiguration.addProperty("domain", req.getServerName());
+        ltiToolConfiguration.addProperty("target_link_uri", baseUrl + "/launch");
+        ltiToolConfiguration.addProperty("description", "Test Vantage - LTI Advantage Regression Testing Platform");
+        
+        JsonArray messages = new JsonArray();
+        JsonObject resourceLink = new JsonObject();
+        resourceLink.addProperty("type", "LtiResourceLinkRequest");
+        resourceLink.addProperty("target_link_uri", baseUrl + "/launch");
+        messages.add(resourceLink);
+        
+        JsonObject deepLinking = new JsonObject();
+        deepLinking.addProperty("type", "LtiDeepLinkingRequest");
+        deepLinking.addProperty("target_link_uri", baseUrl + "/launch");
+        messages.add(deepLinking);
+        
+        ltiToolConfiguration.add("messages", messages);
+        
+        JsonArray claims = new JsonArray();
+        claims.add("iss");
+        claims.add("sub");
+        claims.add("name");
+        claims.add("given_name");
+        claims.add("family_name");
+        claims.add("email");
+        ltiToolConfiguration.add("claims", claims);
+        
+        registrationRequest.add("https://purl.imsglobal.org/spec/lti-tool-configuration", ltiToolConfiguration);
+        
+        try {
+            // Send registration request to tool
+            HttpRequestFactory requestFactory = HTTP_TRANSPORT.createRequestFactory();
+            HttpRequest httpRequest = requestFactory.buildPostRequest(
+                new GenericUrl(toolRegistrationUrl),
+                new JsonHttpContent(new GsonFactory(), registrationRequest)
+            );
+            httpRequest.getHeaders().setContentType("application/json");
+            
+            HttpResponse httpResponse = httpRequest.execute();
+            String responseBody = httpResponse.parseAsString();
+            JsonObject registrationResponse = gson.fromJson(responseBody, JsonObject.class);
+            
+            // Display success page
+            displaySuccessPage(resp, baseUrl, registrationResponse);
+            
+        } catch (Exception e) {
+            displayErrorPage(resp, e.getMessage());
         }
     }
     
-    private void displayRegistrationStart(HttpServletRequest req, HttpServletResponse resp) 
+    private void displaySuccessPage(HttpServletResponse resp, String baseUrl, 
+                                    JsonObject registrationResponse) throws IOException {
+        resp.setContentType("text/html");
+        PrintWriter out = resp.getWriter();
+        
+        String clientId = registrationResponse.has("client_id") 
+            ? registrationResponse.get("client_id").getAsString() 
+            : "N/A";
+        
+        out.println("<!DOCTYPE html><html><head>");
+        out.println("<title>Registration Successful</title>");
+        out.println("<style>");
+        out.println("body { font-family: Arial, sans-serif; max-width: 800px; margin: 50px auto; padding: 20px; text-align: center; }");
+        out.println(".success { background: #d4edda; border: 1px solid #c3e6cb; color: #155724; padding: 20px; border-radius: 5px; margin: 20px 0; }");
+        out.println(".info { background: #f5f5f5; padding: 15px; border-radius: 5px; margin: 20px 0; text-align: left; }");
+        out.println("button { background: #4CAF50; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; margin: 10px; }");
+        out.println("button:hover { background: #45a049; }");
+        out.println("</style>");
+        out.println("</head><body>");
+        
+        out.println("<div class='success'>");
+        out.println("<h1>✓ Registration Successful!</h1>");
+        out.println("<p>Test Vantage has been registered with ChemVantage.</p>");
+        out.println("</div>");
+        
+        out.println("<div class='info'>");
+        out.println("<h3>Registration Details:</h3>");
+        out.println("<strong>Client ID:</strong> " + clientId + "<br>");
+        out.println("<strong>Platform Issuer:</strong> " + baseUrl + "<br>");
+        out.println("<strong>JWKS URI:</strong> " + baseUrl + "/jwks");
+        out.println("</div>");
+        
+        out.println("<p><button onclick='window.close()'>Close Window</button>");
+        out.println("<button onclick=\"window.location='/'\">Return to Home</button></p>");
+        
+        out.println("</body></html>");
+    }
+    
+    private void displayErrorPage(HttpServletResponse resp, String errorMessage) 
             throws IOException {
         resp.setContentType("text/html");
         PrintWriter out = resp.getWriter();
         
-        String baseUrl = req.getScheme() + "://" + req.getServerName() 
-                + (req.getServerPort() != 80 && req.getServerPort() != 443 ? ":" + req.getServerPort() : "");
-        
-        String registrationUrl = baseUrl + "/registration?" 
-                + "openid_configuration=" + baseUrl + "/.well-known/openid-configuration"
-                + "&registration_token=" + UUID.randomUUID().toString();
-        
         out.println("<!DOCTYPE html><html><head>");
-        out.println("<title>Dynamic Registration</title>");
-        out.println("<style>body { font-family: Arial; max-width: 800px; margin: 50px auto; padding: 20px; }");
-        out.println(".code { background: #f5f5f5; padding: 15px; border-radius: 5px; overflow-x: auto; }</style>");
+        out.println("<title>Registration Failed</title>");
+        out.println("<style>");
+        out.println("body { font-family: Arial, sans-serif; max-width: 800px; margin: 50px auto; padding: 20px; text-align: center; }");
+        out.println(".error { background: #f8d7da; border: 1px solid #f5c6cb; color: #721c24; padding: 20px; border-radius: 5px; margin: 20px 0; }");
+        out.println("button { background: #4CAF50; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; margin: 10px; }");
+        out.println("</style>");
         out.println("</head><body>");
-        out.println("<h1>Dynamic Registration</h1>");
-        out.println("<p>Use this URL to initiate Dynamic Registration with ChemVantage:</p>");
-        out.println("<div class='code'><code>" + registrationUrl + "</code></div>");
-        out.println("<p><button onclick=\"navigator.clipboard.writeText('" + registrationUrl + "')\">Copy URL</button></p>");
-        out.println("<p><a href='" + registrationUrl + "' target='_blank'>Or click here to continue</a></p>");
+        
+        out.println("<div class='error'>");
+        out.println("<h1>✗ Registration Failed</h1>");
+        out.println("<p>Error: " + errorMessage + "</p>");
+        out.println("</div>");
+        
+        out.println("<p><button onclick=\"window.location='/registration?action=start'\">Try Again</button>");
+        out.println("<button onclick=\"window.location='/'\">Return to Home</button></p>");
+        
         out.println("</body></html>");
-    }
-    
-    private void handleRegistrationRequest(HttpServletRequest req, HttpServletResponse resp,
-                                          String openid_configuration, String registration_token) 
-            throws IOException {
-        
-        // Return platform configuration for tool to use during registration
-        resp.setContentType("text/html");
-        PrintWriter out = resp.getWriter();
-        
-        String baseUrl = req.getScheme() + "://" + req.getServerName() 
-                + (req.getServerPort() != 80 && req.getServerPort() != 443 ? ":" + req.getServerPort() : "");
-        
-        out.println("<!DOCTYPE html><html><head>");
-        out.println("<title>Complete Registration</title>");
-        out.println("<style>body { font-family: Arial; max-width: 800px; margin: 50px auto; padding: 20px; }");
-        out.println(".code { background: #f5f5f5; padding: 10px; margin: 10px 0; border-radius: 5px; }</style>");
-        out.println("</head><body>");
-        out.println("<h1>Platform Registration Information</h1>");
-        out.println("<p>Provide this information to ChemVantage:</p>");
-        out.println("<div class='code'><strong>Issuer:</strong> " + baseUrl + "</div>");
-        out.println("<div class='code'><strong>Authorization Endpoint:</strong> " + baseUrl + "/oidc/auth</div>");
-        out.println("<div class='code'><strong>Token Endpoint:</strong> " + baseUrl + "/oauth2/token</div>");
-        out.println("<div class='code'><strong>JWKS URI:</strong> " + baseUrl + "/jwks</div>");
-        out.println("<div class='code'><strong>Registration Token:</strong> " + registration_token + "</div>");
-        out.println("<p><a href='/'>Return to Home</a></p>");
-        out.println("</body></html>");
-    }
-    
-    private void handleToolRegistration(HttpServletRequest req, HttpServletResponse resp) 
-            throws IOException {
-        
-        // Parse tool registration request
-        JsonObject registration = gson.fromJson(req.getReader(), JsonObject.class);
-        
-        // Store registration in datastore (simplified for now)
-        String clientId = "chemvantage-client-" + System.currentTimeMillis();
-        
-        // Build registration response
-        JsonObject response = new JsonObject();
-        response.addProperty("client_id", clientId);
-        response.addProperty("client_name", registration.get("client_name").getAsString());
-        
-        String baseUrl = req.getScheme() + "://" + req.getServerName() 
-                + (req.getServerPort() != 80 && req.getServerPort() != 443 ? ":" + req.getServerPort() : "");
-        
-        response.addProperty("issuer", baseUrl);
-        response.addProperty("jwks_uri", baseUrl + "/jwks");
-        response.addProperty("token_endpoint", baseUrl + "/oauth2/token");
-        response.addProperty("authorization_endpoint", baseUrl + "/oidc/auth");
-        
-        resp.setContentType("application/json");
-        resp.getWriter().write(gson.toJson(response));
     }
 }

@@ -75,7 +75,7 @@ public class HomeServlet extends HttpServlet {
         out.println("<p>Initiate the Dynamic Registration flow with ChemVantage.</p>");
         out.println("<button onclick=\"window.location='/registration?action=start'\">Start Dynamic Registration</button>");
         out.println("<div class='info' style='margin-top: 10px;'>");
-        out.println("<strong>Manual Step:</strong> Copy the registration URL and use it to initiate registration with ChemVantage.");
+        out.println("<strong>Note:</strong> This will POST platform registration data to ChemVantage's registration endpoint.");
         out.println("</div>");
         
         out.println("<h3>2. Deep Linking (Assignment Creation)</h3>");
