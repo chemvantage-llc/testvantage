@@ -167,10 +167,26 @@ public class RegistrationServlet extends HttpServlet {
                 new JsonHttpContent(new GsonFactory(), registrationRequest)
             );
             httpRequest.getHeaders().setContentType("application/json");
+            httpRequest.getHeaders().setAccept("application/json");
             
             HttpResponse httpResponse = httpRequest.execute();
+            int statusCode = httpResponse.getStatusCode();
             String responseBody = httpResponse.parseAsString();
-            JsonObject registrationResponse = gson.fromJson(responseBody, JsonObject.class);
+            
+            if (statusCode < 200 || statusCode >= 300) {
+                throw new IOException("Registration failed with status " + statusCode + ": " + responseBody);
+            }
+            
+            // Try to parse response - handle different response formats
+            JsonObject registrationResponse;
+            try {
+                registrationResponse = gson.fromJson(responseBody, JsonObject.class);
+            } catch (Exception parseException) {
+                // If not valid JSON object, create a simple response with the body
+                registrationResponse = new JsonObject();
+                registrationResponse.addProperty("client_id", "unknown");
+                registrationResponse.addProperty("response", responseBody);
+            }
             
             // Display success page
             displaySuccessPage(resp, baseUrl, registrationResponse);
@@ -192,9 +208,10 @@ public class RegistrationServlet extends HttpServlet {
         out.println("<!DOCTYPE html><html><head>");
         out.println("<title>Registration Successful</title>");
         out.println("<style>");
-        out.println("body { font-family: Arial, sans-serif; max-width: 800px; margin: 50px auto; padding: 20px; text-align: center; }");
-        out.println(".success { background: #d4edda; border: 1px solid #c3e6cb; color: #155724; padding: 20px; border-radius: 5px; margin: 20px 0; }");
-        out.println(".info { background: #f5f5f5; padding: 15px; border-radius: 5px; margin: 20px 0; text-align: left; }");
+        out.println("body { font-family: Arial, sans-serif; max-width: 900px; margin: 50px auto; padding: 20px; }");
+        out.println(".success { background: #d4edda; border: 1px solid #c3e6cb; color: #155724; padding: 20px; border-radius: 5px; margin: 20px 0; text-align: center; }");
+        out.println(".info { background: #f5f5f5; padding: 15px; border-radius: 5px; margin: 20px 0; }");
+        out.println(".code { background: #2d2d2d; color: #f8f8f2; padding: 15px; border-radius: 5px; margin: 10px 0; overflow-x: auto; font-family: monospace; font-size: 12px; }");
         out.println("button { background: #4CAF50; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; margin: 10px; }");
         out.println("button:hover { background: #45a049; }");
         out.println("</style>");
@@ -209,11 +226,22 @@ public class RegistrationServlet extends HttpServlet {
         out.println("<h3>Registration Details:</h3>");
         out.println("<strong>Client ID:</strong> " + clientId + "<br>");
         out.println("<strong>Platform Issuer:</strong> " + baseUrl + "<br>");
-        out.println("<strong>JWKS URI:</strong> " + baseUrl + "/jwks");
+        out.println("<strong>JWKS URI:</strong> " + baseUrl + "/jwks<br>");
+        out.println("<strong>Auth Endpoint:</strong> " + baseUrl + "/oidc/auth<br>");
+        out.println("<strong>Token Endpoint:</strong> " + baseUrl + "/oauth2/token");
         out.println("</div>");
         
-        out.println("<p><button onclick='window.close()'>Close Window</button>");
-        out.println("<button onclick=\"window.location='/'\">Return to Home</button></p>");
+        out.println("<div class='info'>");
+        out.println("<h3>Full Response from ChemVantage:</h3>");
+        out.println("<div class='code'>");
+        out.println(gson.toJson(registrationResponse).replace("<", "&lt;").replace(">", "&gt;"));
+        out.println("</div>");
+        out.println("</div>");
+        
+        out.println("<div style='text-align: center;'>");
+        out.println("<button onclick='window.close()'>Close Window</button>");
+        out.println("<button onclick=\"window.location='/'\">Return to Home</button>");
+        out.println("</div>");
         
         out.println("</body></html>");
     }
@@ -226,19 +254,38 @@ public class RegistrationServlet extends HttpServlet {
         out.println("<!DOCTYPE html><html><head>");
         out.println("<title>Registration Failed</title>");
         out.println("<style>");
-        out.println("body { font-family: Arial, sans-serif; max-width: 800px; margin: 50px auto; padding: 20px; text-align: center; }");
-        out.println(".error { background: #f8d7da; border: 1px solid #f5c6cb; color: #721c24; padding: 20px; border-radius: 5px; margin: 20px 0; }");
+        out.println("body { font-family: Arial, sans-serif; max-width: 900px; margin: 50px auto; padding: 20px; }");
+        out.println(".error { background: #f8d7da; border: 1px solid #f5c6cb; color: #721c24; padding: 20px; border-radius: 5px; margin: 20px 0; text-align: center; }");
+        out.println(".details { background: #f5f5f5; padding: 15px; border-radius: 5px; margin: 20px 0; }");
+        out.println(".code { background: #2d2d2d; color: #f8f8f2; padding: 15px; border-radius: 5px; margin: 10px 0; overflow-x: auto; font-family: monospace; font-size: 12px; white-space: pre-wrap; word-wrap: break-word; }");
         out.println("button { background: #4CAF50; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; margin: 10px; }");
         out.println("</style>");
         out.println("</head><body>");
         
         out.println("<div class='error'>");
         out.println("<h1>✗ Registration Failed</h1>");
-        out.println("<p>Error: " + errorMessage + "</p>");
+        out.println("<p>Unable to complete registration with ChemVantage.</p>");
         out.println("</div>");
         
-        out.println("<p><button onclick=\"window.location='/registration?action=start'\">Try Again</button>");
-        out.println("<button onclick=\"window.location='/'\">Return to Home</button></p>");
+        out.println("<div class='details'>");
+        out.println("<h3>Error Details:</h3>");
+        out.println("<div class='code'>" + errorMessage.replace("<", "&lt;").replace(">", "&gt;") + "</div>");
+        out.println("</div>");
+        
+        out.println("<div class='details'>");
+        out.println("<h3>Troubleshooting:</h3>");
+        out.println("<ul>");
+        out.println("<li>Verify the ChemVantage registration URL is correct</li>");
+        out.println("<li>Check that ChemVantage's registration endpoint is accessible</li>");
+        out.println("<li>Ensure ChemVantage expects the LTI 1.3 Dynamic Registration format</li>");
+        out.println("<li>Check the error message above for specific details</li>");
+        out.println("</ul>");
+        out.println("</div>");
+        
+        out.println("<div style='text-align: center;'>");
+        out.println("<button onclick=\"window.location='/registration?action=start'\">Try Again</button>");
+        out.println("<button onclick=\"window.location='/'\">Return to Home</button>");
+        out.println("</div>");
         
         out.println("</body></html>");
     }
