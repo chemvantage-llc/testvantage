@@ -17,6 +17,7 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.util.Date;
 
 /**
  * Handles LTI 1.3 Dynamic Registration
@@ -93,7 +94,7 @@ public class RegistrationServlet extends HttpServlet {
         out.println("<div class='form-group'>");
         out.println("<label for='registration_url'>ChemVantage Registration URL:</label>");
         out.println("<input type='text' id='registration_url' name='registration_url' ");
-        out.println("placeholder='https://www.chemvantage.org/lti/registration' required>");
+        out.println("value='https://www.chemvantage.org/lti/registration' required>");
         out.println("</div>");
         out.println("<button type='submit'>Register Platform</button>");
         out.println("<a href='/' style='margin-left: 10px;'>Cancel</a>");
@@ -104,62 +105,68 @@ public class RegistrationServlet extends HttpServlet {
     
     private void performRegistration(HttpServletRequest req, HttpServletResponse resp,
                                      String toolRegistrationUrl) throws IOException {
-        
-        String baseUrl = req.getScheme() + "://" + req.getServerName() 
-                + (req.getServerPort() != 80 && req.getServerPort() != 443 ? ":" + req.getServerPort() : "");
-        
-        // Build registration request payload
-        JsonObject registrationRequest = new JsonObject();
-        registrationRequest.addProperty("application_type", "web");
-        registrationRequest.addProperty("grant_types", "client_credentials,implicit");
-        registrationRequest.addProperty("response_types", "id_token");
-        registrationRequest.addProperty("client_name", "Test Vantage LMS");
-        registrationRequest.addProperty("client_uri", baseUrl);
-        registrationRequest.addProperty("logo_uri", baseUrl + "/logo.png");
-        registrationRequest.addProperty("tos_uri", baseUrl + "/tos");
-        registrationRequest.addProperty("policy_uri", baseUrl + "/policy");
-        registrationRequest.addProperty("jwks_uri", baseUrl + "/jwks");
-        registrationRequest.addProperty("token_endpoint_auth_method", "private_key_jwt");
-        
-        JsonArray redirectUris = new JsonArray();
-        redirectUris.add(baseUrl + "/oidc/auth");
-        registrationRequest.add("redirect_uris", redirectUris);
-        
-        JsonArray scopes = new JsonArray();
-        scopes.add("openid");
-        registrationRequest.addProperty("scope", "openid");
-        
-        // LTI-specific claims
-        JsonObject ltiToolConfiguration = new JsonObject();
-        ltiToolConfiguration.addProperty("domain", req.getServerName());
-        ltiToolConfiguration.addProperty("target_link_uri", baseUrl + "/launch");
-        ltiToolConfiguration.addProperty("description", "Test Vantage - LTI Advantage Regression Testing Platform");
-        
-        JsonArray messages = new JsonArray();
-        JsonObject resourceLink = new JsonObject();
-        resourceLink.addProperty("type", "LtiResourceLinkRequest");
-        resourceLink.addProperty("target_link_uri", baseUrl + "/launch");
-        messages.add(resourceLink);
-        
-        JsonObject deepLinking = new JsonObject();
-        deepLinking.addProperty("type", "LtiDeepLinkingRequest");
-        deepLinking.addProperty("target_link_uri", baseUrl + "/launch");
-        messages.add(deepLinking);
-        
-        ltiToolConfiguration.add("messages", messages);
-        
-        JsonArray claims = new JsonArray();
-        claims.add("iss");
-        claims.add("sub");
-        claims.add("name");
-        claims.add("given_name");
-        claims.add("family_name");
-        claims.add("email");
-        ltiToolConfiguration.add("claims", claims);
-        
-        registrationRequest.add("https://purl.imsglobal.org/spec/lti-tool-configuration", ltiToolConfiguration);
-        
         try {
+            TestResult result = TestResult.load("LTI Dynamic Registration");
+            if (result == null) {
+                result = new TestResult();
+                result.setTitle("LTI Dynamic Registration");
+            }
+            
+            Date startTime = new Date();
+            String baseUrl = req.getScheme() + "://" + req.getServerName() 
+                    + (req.getServerPort() != 80 && req.getServerPort() != 443 ? ":" + req.getServerPort() : "");
+            
+            // Build registration request payload
+            JsonObject registrationRequest = new JsonObject();
+            registrationRequest.addProperty("application_type", "web");
+            registrationRequest.addProperty("grant_types", "client_credentials,implicit");
+            registrationRequest.addProperty("response_types", "id_token");
+            registrationRequest.addProperty("client_name", "Test Vantage LMS");
+            registrationRequest.addProperty("client_uri", baseUrl);
+            registrationRequest.addProperty("logo_uri", baseUrl + "/logo.png");
+            registrationRequest.addProperty("tos_uri", baseUrl + "/tos");
+            registrationRequest.addProperty("policy_uri", baseUrl + "/policy");
+            registrationRequest.addProperty("jwks_uri", baseUrl + "/jwks");
+            registrationRequest.addProperty("token_endpoint_auth_method", "private_key_jwt");
+            
+            JsonArray redirectUris = new JsonArray();
+            redirectUris.add(baseUrl + "/oidc/auth");
+            registrationRequest.add("redirect_uris", redirectUris);
+            
+            JsonArray scopes = new JsonArray();
+            scopes.add("openid");
+            registrationRequest.addProperty("scope", "openid");
+            
+            // LTI-specific claims
+            JsonObject ltiToolConfiguration = new JsonObject();
+            ltiToolConfiguration.addProperty("domain", req.getServerName());
+            ltiToolConfiguration.addProperty("target_link_uri", baseUrl + "/launch");
+            ltiToolConfiguration.addProperty("description", "Test Vantage - LTI Advantage Regression Testing Platform");
+            
+            JsonArray messages = new JsonArray();
+            JsonObject resourceLink = new JsonObject();
+            resourceLink.addProperty("type", "LtiResourceLinkRequest");
+            resourceLink.addProperty("target_link_uri", baseUrl + "/launch");
+            messages.add(resourceLink);
+            
+            JsonObject deepLinking = new JsonObject();
+            deepLinking.addProperty("type", "LtiDeepLinkingRequest");
+            deepLinking.addProperty("target_link_uri", baseUrl + "/launch");
+            messages.add(deepLinking);
+            
+            ltiToolConfiguration.add("messages", messages);
+            
+            JsonArray claims = new JsonArray();
+            claims.add("iss");
+            claims.add("sub");
+            claims.add("name");
+            claims.add("given_name");
+            claims.add("family_name");
+            claims.add("email");
+            ltiToolConfiguration.add("claims", claims);
+            
+            registrationRequest.add("https://purl.imsglobal.org/spec/lti-tool-configuration", ltiToolConfiguration);
+            
             // Send registration request to tool
             HttpRequestFactory requestFactory = HTTP_TRANSPORT.createRequestFactory();
             HttpRequest httpRequest = requestFactory.buildPostRequest(
@@ -188,8 +195,16 @@ public class RegistrationServlet extends HttpServlet {
                 registrationResponse.addProperty("response", responseBody);
             }
             
-            // Display success page
-            displaySuccessPage(resp, baseUrl, registrationResponse);
+            result.setStartTime(startTime);
+            result.setElapsedTime(new Date().getTime() - startTime.getTime());
+            result.setResponseText(registrationResponse.toString());
+            result.save();
+            
+            if (result.isPassedTest()) { // Display success page
+                displaySuccessPage(resp, baseUrl, registrationResponse);
+            } else { // Display error page with details}
+                displayErrorPage(resp, "Registration response does not match gold standard.");
+            }
             
         } catch (Exception e) {
             displayErrorPage(resp, e.getMessage());
