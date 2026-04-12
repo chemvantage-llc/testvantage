@@ -44,9 +44,9 @@ public class TestReportServlet extends HttpServlet {
         boolean allPassed = true;
 
         for (TestResult result : results) {
-            Date start = result.getStartTime();
-            if (start != null && (latestStart == null || start.after(latestStart))) {
-                latestStart = start;
+            Date completedAt = result.getCompletedAt() != null ? result.getCompletedAt() : result.getStartTime();
+            if (completedAt != null && (latestStart == null || completedAt.after(latestStart))) {
+                latestStart = completedAt;
             }
 
             if (!result.isPassedTest()) {
@@ -63,9 +63,11 @@ public class TestReportServlet extends HttpServlet {
             for (TestResult result : results) {
                 if (!result.isPassedTest()) {
                     String title = result.getTitle() == null ? "Unknown" : result.getTitle();
-                    Date start = result.getStartTime();
-                    String when = start == null ? "unknown time" : DATE_FORMAT.format(start);
-                    out.println("<li>[" + title + "] test failed at " + when + "</li>");
+                    Date completedAt = result.getCompletedAt() != null ? result.getCompletedAt() : result.getStartTime();
+                    String when = completedAt == null ? "unknown time" : DATE_FORMAT.format(completedAt);
+                    String summary = result.getSummary() == null ? "No summary available." : result.getSummary();
+                        String target = result.getTargetUrl() == null ? "unknown target" : result.getTargetUrl();
+                        out.println("<li>[" + title + "] test failed at " + when + " on " + target + " - " + summary + "</li>");
                 }
             }
             out.println("</ul>");

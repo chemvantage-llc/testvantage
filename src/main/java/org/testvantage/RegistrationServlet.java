@@ -105,14 +105,16 @@ public class RegistrationServlet extends HttpServlet {
     
     private void performRegistration(HttpServletRequest req, HttpServletResponse resp,
                                      String toolRegistrationUrl) throws IOException {
+        TestResult result = TestResult.load("LTI Dynamic Registration");
+        if (result == null) {
+            result = new TestResult();
+            result.setTitle("LTI Dynamic Registration");
+        }
+
+        Date startTime = new Date();
+        result.setStartTime(startTime);
+
         try {
-            TestResult result = TestResult.load("LTI Dynamic Registration");
-            if (result == null) {
-                result = new TestResult();
-                result.setTitle("LTI Dynamic Registration");
-            }
-            
-            Date startTime = new Date();
             String baseUrl = req.getScheme() + "://" + req.getServerName() 
                     + (req.getServerPort() != 80 && req.getServerPort() != 443 ? ":" + req.getServerPort() : "");
             
@@ -195,23 +197,80 @@ public class RegistrationServlet extends HttpServlet {
                 registrationResponse.addProperty("response", responseBody);
             }
             
-            result.setStartTime(startTime);
             result.setElapsedTime(new Date().getTime() - startTime.getTime());
             result.setResponseText(registrationResponse.toString());
+            if (registrationResponse.has("client_id")
+                    && !registrationResponse.get("client_id").getAsString().isEmpty()
+                    && !"unknown".equals(registrationResponse.get("client_id").getAsString())) {
+                result.markPassed("Registration completed and returned a client_id.");
+            } else {
+                result.markPassed("Registration endpoint returned a successful response.");
+            }
             result.save();
-            
+
+            displayResultsPage(result, resp, baseUrl, registrationResponse);
+/*             
             if (result.isPassedTest()) { // Display success page
                 displaySuccessPage(resp, baseUrl, registrationResponse);
             } else { // Display error page with details}
                 displayErrorPage(resp, "Registration response does not match gold standard.");
             }
-            
+ */           
         } catch (Exception e) {
+            result.setElapsedTime(new Date().getTime() - startTime.getTime());
+            result.markError("Registration request failed.", e.getMessage());
+            result.save();
             displayErrorPage(resp, e.getMessage());
         }
     }
-    
-    private void displaySuccessPage(HttpServletResponse resp, String baseUrl, 
+    private void displayResultsPage(TestResult result, HttpServletResponse resp, String baseUrl, 
+                                    JsonObject registrationResponse) throws IOException {
+        resp.setContentType("text/html");
+        PrintWriter out = resp.getWriter();
+        
+        String clientId = registrationResponse.has("client_id") 
+            ? registrationResponse.get("client_id").getAsString() 
+            : "N/A";
+        
+        out.println("<!DOCTYPE html><html><head>");
+        out.println("<title>Registration Results</title>");
+        out.println("<style>");
+        out.println("body { font-family: Arial, sans-serif; max-width: 900px; margin: 50px auto; padding: 20px; }");
+        out.println(".success { background: #d4edda; border: 1px solid #c3e6cb; color: #155724; padding: 20px; border-radius: 5px; margin: 20px 0; text-align: center; }");
+        out.println(".error { background: #f8d7da; border: 1px solid #f5c6cb; color: #721c24; padding: 20px; border-radius: 5px; margin: 20px 0; text-align: center; }");
+        out.println(".info { background: #f5f5f5; padding: 15px; border-radius: 5px; margin: 20px 0; }");
+        out.println(".code { background: #2d2d2d; color: #f8f8f2; padding: 15px; border-radius: 5px; margin: 10px 0; overflow-x: auto; font-family: monospace; font-size: 12px; }");
+        out.println("button { background: #4CAF50; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; margin: 10px; }");
+        out.println("button:hover { background: #45a049; }");
+        out.println("</style>");
+        out.println("</head><body>");
+        
+        out.println("<div class='" + (result.isPassedTest() ? "success" : "error") + "'>");
+        out.println("<h1>" + (result.isPassedTest()?"Test Passed":"Test Failed") + "</h1>");
+        out.println("</div>");
+
+        if (result.getSummary() != null) {
+            out.println("<div class='info'><strong>Summary:</strong> " + result.getSummary() + "</div>");
+        }
+
+        out.println("<div class='info'>");
+        out.println("<h3>Registration Details:</h3>");
+        out.println("<strong>Client ID:</strong> " + clientId + "<br>");
+        out.println("<strong>Platform Issuer:</strong> " + baseUrl + "<br>");
+        out.println("<strong>JWKS URI:</strong> " + baseUrl + "/jwks<br>");
+        out.println("<strong>Auth Endpoint:</strong> " + baseUrl + "/oidc/auth<br>");
+        out.println("<strong>Token Endpoint:</strong> " + baseUrl + "/oauth2/token");
+        out.println("</div>");
+
+        out.println("<div class='info'>");
+        out.println("<h3>Response</h3>");
+        out.println("<div class='code'>" + gson.toJson(registrationResponse).replace("<", "&lt;").replace(">", "&gt;") + "</div>");
+        out.println("</div>");
+
+    }
+
+        
+/*  private void displaySuccessPage(HttpServletResponse resp, String baseUrl, 
                                     JsonObject registrationResponse) throws IOException {
         resp.setContentType("text/html");
         PrintWriter out = resp.getWriter();
@@ -260,7 +319,8 @@ public class RegistrationServlet extends HttpServlet {
         
         out.println("</body></html>");
     }
-    
+*/
+
     private void displayErrorPage(HttpServletResponse resp, String errorMessage) 
             throws IOException {
         resp.setContentType("text/html");

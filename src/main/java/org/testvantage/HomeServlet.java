@@ -77,6 +77,24 @@ public class HomeServlet extends HttpServlet {
         out.println("<div class='info' style='margin-top: 10px;'>");
         out.println("<strong>Note:</strong> This will POST platform registration data to ChemVantage's registration endpoint.");
         out.println("</div>");
+
+        out.println("<h3>1a. JWKS Endpoint Test</h3>");
+        out.println("<p>Run an automated assertion-based test against the ChemVantage JWKS endpoint.</p>");
+        out.println("<button onclick=\"window.location='/test/jwks'\">Open JWKS Test</button>");
+
+        out.println("<h3>1b. Auth Token Endpoint Test</h3>");
+        out.println("<p>Run the ChemVantage auth token workflow test: GET with iss/login_hint/target_link_uri and verify HTML redirects using window.location.replace(...).</p>");
+        out.println("<button onclick=\"window.location='/test/auth-token'\">Open Auth Token Test</button>");
+
+        out.println("<h3>1c. LTI Launch Test (4 Scenarios)</h3>");
+        out.println("<p>Run automated tests for LTI resource link launch with different user roles and assignment contexts:</p>");
+        out.println("<ul>");
+        out.println("<li>Instructor launch for a known assignment</li>");
+        out.println("<li>Student launch for a known assignment</li>");
+        out.println("<li>Instructor launch for a new assignment</li>");
+        out.println("<li>Student launch for a new assignment</li>");
+        out.println("</ul>");
+        out.println("<button onclick=\"window.location='/test/launch'\">Open Launch Test</button>");
         
         out.println("<h3>2. Deep Linking (Assignment Creation)</h3>");
         out.println("<p>Test deep linking to select and create content in ChemVantage.</p>");
@@ -129,6 +147,13 @@ public class HomeServlet extends HttpServlet {
         out.println("<div id='activity'>");
         out.println("<p><em>Activity will be logged here...</em></p>");
         out.println("</div>");
+        out.println("</div>");
+
+        out.println("<div class='section'>");
+        out.println("<h2>Admin Integration</h2>");
+        out.println("<p>Status JSON for ChemVantage Admin: <code>" + baseUrl + "/api/status</code></p>");
+        out.println("<p>Compact banner JSON: <code>" + baseUrl + "/api/status?view=banner</code></p>");
+        out.println("<p>Example filtered banner: <code>" + baseUrl + "/api/status?view=banner&amp;suiteId=jwks&amp;target=prod</code></p>");
         out.println("</div>");
         
         out.println("<script>");

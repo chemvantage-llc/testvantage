@@ -130,6 +130,46 @@
         <url-pattern>/test-report</url-pattern>
     </servlet-mapping>
 
+    <!-- JWKS Test Suite -->
+    <servlet>
+        <servlet-name>JwksTest</servlet-name>
+        <servlet-class>org.testvantage.JwksTestServlet</servlet-class>
+    </servlet>
+    <servlet-mapping>
+        <servlet-name>JwksTest</servlet-name>
+        <url-pattern>/test/jwks</url-pattern>
+    </servlet-mapping>
+
+    <!-- Auth Token Test Suite -->
+    <servlet>
+        <servlet-name>AuthTokenTest</servlet-name>
+        <servlet-class>org.testvantage.AuthTokenTestServlet</servlet-class>
+    </servlet>
+    <servlet-mapping>
+        <servlet-name>AuthTokenTest</servlet-name>
+        <url-pattern>/test/auth-token</url-pattern>
+    </servlet-mapping>
+
+    <!-- Launch Test Suite -->
+    <servlet>
+        <servlet-name>LaunchTest</servlet-name>
+        <servlet-class>org.testvantage.LaunchTestServlet</servlet-class>
+    </servlet>
+    <servlet-mapping>
+        <servlet-name>LaunchTest</servlet-name>
+        <url-pattern>/test/launch</url-pattern>
+    </servlet-mapping>
+
+    <!-- Test Status API -->
+    <servlet>
+        <servlet-name>TestStatusApi</servlet-name>
+        <servlet-class>org.testvantage.TestStatusApiServlet</servlet-class>
+    </servlet>
+    <servlet-mapping>
+        <servlet-name>TestStatusApi</servlet-name>
+        <url-pattern>/api/status</url-pattern>
+    </servlet-mapping>
+
     <!-- OpenID Configuration -->
     <servlet>
         <servlet-name>OIDCConfiguration</servlet-name>
