@@ -80,13 +80,12 @@ public class LaunchTestServlet extends HttpServlet {
         out.println("<option value='dev'" + ("dev".equals(selectedTarget) ? " selected" : "") + ">Development</option>");
         out.println("</select>");
 
-        out.println("<label for='role'>Use Case</label>");
+        out.println("<label for='role'>User Role</label>");
         out.println("<select name='role' id='role'>");
         out.println("<option value='instructor'" + (selectedUseCase.contains("instructor") ? " selected" : "") + ">Instructor Launch</option>");
-        out.println("<div class='role-desc'>User is an instructor launching an assignment</div>");
         out.println("<option value='student'" + (selectedUseCase.contains("student") ? " selected" : "") + ">Student Launch</option>");
-        out.println("<div class='role-desc'>User is a student launching an assignment</div>");
         out.println("</select>");
+        out.println("<div class='use-case-desc'>Instructor: Views assignment page; Student: Launches assignment to work on it</div>");
 
         out.println("<label for='issuer'>Issuer (iss)</label>");
         out.println("<input type='text' name='issuer' id='issuer' value='" + safeAttribute(suggestedIssuer) + "'>");
