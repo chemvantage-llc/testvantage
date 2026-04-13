@@ -1,367 +1,553 @@
 package org.testvantage;
 
-import com.google.gson.Gson;
-import com.google.gson.JsonArray;
-import com.google.gson.JsonObject;
+import java.io.IOException;
+import java.io.PrintWriter;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.Map;
+
+import javax.servlet.ServletException;
+import javax.servlet.annotation.WebServlet;
+import javax.servlet.http.HttpServlet;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+
 import com.google.api.client.http.GenericUrl;
 import com.google.api.client.http.HttpRequest;
 import com.google.api.client.http.HttpRequestFactory;
 import com.google.api.client.http.HttpResponse;
 import com.google.api.client.http.HttpTransport;
+import com.google.api.client.http.UrlEncodedContent;
 import com.google.api.client.http.javanet.NetHttpTransport;
-import com.google.api.client.http.json.JsonHttpContent;
-import com.google.api.client.json.gson.GsonFactory;
-import javax.servlet.ServletException;
-import javax.servlet.http.HttpServlet;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-import java.io.IOException;
-import java.io.PrintWriter;
-import java.util.Date;
 
 /**
- * Handles LTI 1.3 Dynamic Registration
- * This platform initiates registration with the tool (ChemVantage)
+ * Tests Dynamic Registration workflow with ChemVantage
+ * Two-stage process: Initial form request -> Form submission with contact info
  */
+@WebServlet(urlPatterns = {"/test/registration", "/registration"})
 public class RegistrationServlet extends HttpServlet {
-    
-    private static final Gson gson = new Gson();
+
     private static final HttpTransport HTTP_TRANSPORT = new NetHttpTransport();
-    
+    private static final String TEST_TITLE = "ChemVantage Dynamic Registration";
+    private static final String SUITE_ID = "registration";
+    private static final String REGISTRATION_CODE_DEV = "bfc12c656d84";
+
     @Override
-    protected void doGet(HttpServletRequest req, HttpServletResponse resp) 
-            throws ServletException, IOException {
-        
-        String action = req.getParameter("action");
-        
-        if ("start".equals(action)) {
-            // Display registration form
-            displayRegistrationForm(req, resp);
-        } else {
-            resp.sendRedirect("/?action=start");
+    protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
+        resp.setContentType("text/html");
+        PrintWriter out = resp.getWriter();
+
+        String selectedTarget = req.getParameter("target");
+        if (selectedTarget == null || selectedTarget.isEmpty()) {
+            selectedTarget = "prod";
         }
+
+        String selectedLms = req.getParameter("lms");
+        if (selectedLms == null || selectedLms.isEmpty()) {
+            selectedLms = "canvas";
+        }
+
+        String useCaseKey = selectedTarget + "/" + selectedLms;
+        TestResult result = TestResult.load(TEST_TITLE + " - " + useCaseKey);
+
+        out.println("<!DOCTYPE html><html><head>");
+        out.println("<title>Dynamic Registration Test</title>");
+        out.println("<style>");
+        out.println("body { font-family: Arial, sans-serif; max-width: 960px; margin: 50px auto; padding: 20px; }");
+        out.println(".panel { background: #f5f5f5; border-radius: 6px; padding: 18px; margin: 18px 0; }");
+        out.println(".success { background: #d4edda; border: 1px solid #c3e6cb; color: #155724; }");
+        out.println(".error { background: #f8d7da; border: 1px solid #f5c6cb; color: #721c24; }");
+        out.println(".info { background: #d1ecf1; border: 1px solid #bee5eb; color: #0c5460; }");
+        out.println(".code { background: #2d2d2d; color: #f8f8f2; padding: 15px; border-radius: 5px; white-space: pre-wrap; word-wrap: break-word; }");
+        out.println("button { background: #1f6feb; color: white; padding: 10px 18px; border: none; border-radius: 4px; cursor: pointer; }");
+        out.println("input, select { padding: 8px; margin: 4px 0 12px 0; width: 100%; box-sizing: border-box; }");
+        out.println("label { display: block; font-weight: bold; margin-top: 10px; }");
+        out.println(".use-case-desc { font-size: 0.9em; color: #555; margin-left: 20px; margin-top: -8px; }");
+        out.println(".hidden { display: none; }");
+        out.println("</style></head><body>");
+
+        out.println("<h1>Dynamic Registration Test</h1>");
+        out.println("<p>Tests the LTI 1.3 Dynamic Registration workflow with ChemVantage (two-stage process).</p>");
+
+        out.println("<form method='POST' action='/test/registration'>");
+
+        out.println("<label for='target'>Target</label>");
+        out.println("<select name='target' id='target' onchange='toggleRegistrationCode()'>");
+        out.println("<option value='prod'" + ("prod".equals(selectedTarget) ? " selected" : "") + ">Production</option>");
+        out.println("<option value='dev'" + ("dev".equals(selectedTarget) ? " selected" : "") + ">Development</option>");
+        out.println("</select>");
+
+        out.println("<label for='lms'>LMS Platform</label>");
+        out.println("<select name='lms' id='lms'>");
+        out.println("<option value='canvas'" + ("canvas".equals(selectedLms) ? " selected" : "") + ">Canvas (Trusted)</option>");
+        out.println("<option value='moodle'" + ("moodle".equals(selectedLms) ? " selected" : "") + ">Moodle (Untrusted)</option>");
+        out.println("</select>");
+
+        String registrationCodeDisplay = "dev".equals(selectedTarget) ? "" : " hidden";
+        out.println("<div id='registrationCodeDiv' class='" + registrationCodeDisplay + "'>");
+        out.println("<label for='registrationCode'>Registration Code (Dev Only)</label>");
+        out.println("<input type='text' name='registrationCode' id='registrationCode' value='" + REGISTRATION_CODE_DEV + "' placeholder='Enter code for dev registration'>");
+        out.println("</div>");
+
+        out.println("<button type='submit'>Start Registration</button>");
+        out.println("</form>");
+
+        out.println("<div class='panel info'>");
+        out.println("<strong>Stage 1 (Form Request):</strong> Must return HTTP 200 and HTML with 'LTI Advantage Dynamic Registration'<br>");
+        out.println("<strong>Stage 2 (Form Submission):</strong> Expected text depends on target and LMS:<br>");
+        out.println("<ul>");
+        out.println("<li><strong>prod/canvas:</strong> 'Your Deployment is Active'</li>");
+        out.println("<li><strong>prod/moodle:</strong> 'Your Deployment is Currently Under Review'</li>");
+        out.println("<li><strong>dev/canvas:</strong> 'Your Deployment is Active'</li>");
+        out.println("<li><strong>dev/moodle:</strong> 'Your Deployment is Active'</li>");
+        out.println("</ul>");
+        out.println("</div>");
+
+        if (result != null) {
+            String panelClass = result.isPassedTest() ? "panel success" : "panel error";
+            out.println("<div class='" + panelClass + "'>");
+            out.println("<h2>Latest Result</h2>");
+            out.println("<p><strong>Status:</strong> " + safe(result.getStatus()) + "</p>");
+            out.println("<p><strong>Target:</strong> " + safe(result.getTargetUrl()) + "</p>");
+            out.println("<p><strong>Completed:</strong> " + safe(String.valueOf(result.getCompletedAt())) + "</p>");
+            out.println("<p><strong>Summary:</strong> " + safe(result.getSummary()) + "</p>");
+            if (result.getDetails() != null) {
+                out.println("<div class='code'>" + escapeHtml(result.getDetails()) + "</div>");
+            }
+            out.println("</div>");
+        }
+
+        out.println("<script>");
+        out.println("function toggleRegistrationCode() {");
+        out.println("  var target = document.getElementById('target').value;");
+        out.println("  var codeDiv = document.getElementById('registrationCodeDiv');");
+        out.println("  if (target === 'dev') {");
+        out.println("    codeDiv.classList.remove('hidden');");
+        out.println("  } else {");
+        out.println("    codeDiv.classList.add('hidden');");
+        out.println("  }");
+        out.println("}");
+        out.println("</script>");
+
+        out.println("</body></html>");
     }
-    
+
     @Override
-    protected void doPost(HttpServletRequest req, HttpServletResponse resp) 
-            throws ServletException, IOException {
+    protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
+        // Check if this is a registration request from ChemVantage (identified by Bearer token or JSON content type)
+        String authHeader = req.getHeader("Authorization");
+        String contentType = req.getContentType();
+        boolean isChemVantageRegistrationRequest = (authHeader != null && authHeader.startsWith("Bearer ")) ||
+                (contentType != null && contentType.contains("application/json"));
         
-        String toolRegistrationUrl = req.getParameter("registration_url");
-        
-        if (toolRegistrationUrl == null || toolRegistrationUrl.isEmpty()) {
-            resp.sendError(HttpServletResponse.SC_BAD_REQUEST, "Missing registration_url parameter");
+        if (isChemVantageRegistrationRequest) {
+            // Handle ChemVantage registration callback request
+            handleChemVantageRegistration(req, resp);
             return;
         }
         
-        // Perform registration with the tool
-        performRegistration(req, resp, toolRegistrationUrl);
-    }
-    
-    private void displayRegistrationForm(HttpServletRequest req, HttpServletResponse resp) 
-            throws IOException {
-        resp.setContentType("text/html");
-        PrintWriter out = resp.getWriter();
-        
-        String baseUrl = req.getScheme() + "://" + req.getServerName() 
-                + (req.getServerPort() != 80 && req.getServerPort() != 443 ? ":" + req.getServerPort() : "");
-        
-        out.println("<!DOCTYPE html><html><head>");
-        out.println("<title>LTI Dynamic Registration</title>");
-        out.println("<style>");
-        out.println("body { font-family: Arial, sans-serif; max-width: 800px; margin: 50px auto; padding: 20px; }");
-        out.println("h1 { color: #333; }");
-        out.println(".form-group { margin: 20px 0; }");
-        out.println("label { display: block; margin-bottom: 5px; font-weight: bold; }");
-        out.println("input[type='text'] { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px; }");
-        out.println("button { background: #4CAF50; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; }");
-        out.println("button:hover { background: #45a049; }");
-        out.println(".info { background: #d1ecf1; border: 1px solid #bee5eb; padding: 15px; border-radius: 5px; margin: 20px 0; }");
-        out.println("</style>");
-        out.println("</head><body>");
-        
-        out.println("<h1>Dynamic Registration with ChemVantage</h1>");
-        out.println("<p>This will register Test Vantage as a platform with ChemVantage.</p>");
-        
-        out.println("<div class='info'>");
-        out.println("<strong>Platform Information:</strong><br>");
-        out.println("Issuer: " + baseUrl + "<br>");
-        out.println("JWKS URI: " + baseUrl + "/jwks<br>");
-        out.println("Auth Endpoint: " + baseUrl + "/oidc/auth<br>");
-        out.println("Token Endpoint: " + baseUrl + "/oauth2/token");
-        out.println("</div>");
-        
-        out.println("<form method='POST' action='/registration'>");
-        out.println("<div class='form-group'>");
-        out.println("<label for='registration_url'>ChemVantage Registration URL:</label>");
-        out.println("<input type='text' id='registration_url' name='registration_url' ");
-        out.println("value='https://www.chemvantage.org/lti/registration' required>");
-        out.println("</div>");
-        out.println("<button type='submit'>Register Platform</button>");
-        out.println("<a href='/' style='margin-left: 10px;'>Cancel</a>");
-        out.println("</form>");
-        
-        out.println("</body></html>");
-    }
-    
-    private void performRegistration(HttpServletRequest req, HttpServletResponse resp,
-                                     String toolRegistrationUrl) throws IOException {
-        TestResult result = TestResult.load("LTI Dynamic Registration");
+        // Handle test UI form submission (original logic)
+        String targetUrl = ChemVantageTargets.resolve(req.getParameter("target"));
+        String lms = trimToNull(req.getParameter("lms"));
+        String registrationCode = trimToNull(req.getParameter("registrationCode"));
+        String target = req.getParameter("target");
+
+        if (lms == null) {
+            lms = "canvas";
+        }
+
+        String useCaseKey = target + "/" + lms;
+        String resultTitle = TEST_TITLE + " - " + useCaseKey;
+        TestResult result = TestResult.load(resultTitle);
         if (result == null) {
             result = new TestResult();
-            result.setTitle("LTI Dynamic Registration");
+            result.setTitle(resultTitle);
         }
 
+        result.setSuiteId(SUITE_ID);
+        result.setScenarioId("registration-" + useCaseKey);
+        result.setTargetUrl(targetUrl);
         Date startTime = new Date();
         result.setStartTime(startTime);
+        String debugDetails = "target=" + targetUrl + "\nuseCase=" + useCaseKey + "\ncontactEmail=" + "admin@testlms.edu";
 
         try {
-            String baseUrl = req.getScheme() + "://" + req.getServerName() 
-                    + (req.getServerPort() != 80 && req.getServerPort() != 443 ? ":" + req.getServerPort() : "");
-            
-            // Build registration request payload
-            JsonObject registrationRequest = new JsonObject();
-            registrationRequest.addProperty("application_type", "web");
-            registrationRequest.addProperty("grant_types", "client_credentials,implicit");
-            registrationRequest.addProperty("response_types", "id_token");
-            registrationRequest.addProperty("client_name", "Test Vantage LMS");
-            registrationRequest.addProperty("client_uri", baseUrl);
-            registrationRequest.addProperty("logo_uri", baseUrl + "/logo.png");
-            registrationRequest.addProperty("tos_uri", baseUrl + "/tos");
-            registrationRequest.addProperty("policy_uri", baseUrl + "/policy");
-            registrationRequest.addProperty("jwks_uri", baseUrl + "/jwks");
-            registrationRequest.addProperty("token_endpoint_auth_method", "private_key_jwt");
-            
-            JsonArray redirectUris = new JsonArray();
-            redirectUris.add(baseUrl + "/oidc/auth");
-            registrationRequest.add("redirect_uris", redirectUris);
-            
-            JsonArray scopes = new JsonArray();
-            scopes.add("openid");
-            registrationRequest.addProperty("scope", "openid");
-            
-            // LTI-specific claims
-            JsonObject ltiToolConfiguration = new JsonObject();
-            ltiToolConfiguration.addProperty("domain", req.getServerName());
-            ltiToolConfiguration.addProperty("target_link_uri", baseUrl + "/launch");
-            ltiToolConfiguration.addProperty("description", "Test Vantage - LTI Advantage Regression Testing Platform");
-            
-            JsonArray messages = new JsonArray();
-            JsonObject resourceLink = new JsonObject();
-            resourceLink.addProperty("type", "LtiResourceLinkRequest");
-            resourceLink.addProperty("target_link_uri", baseUrl + "/launch");
-            messages.add(resourceLink);
-            
-            JsonObject deepLinking = new JsonObject();
-            deepLinking.addProperty("type", "LtiDeepLinkingRequest");
-            deepLinking.addProperty("target_link_uri", baseUrl + "/launch");
-            messages.add(deepLinking);
-            
-            ltiToolConfiguration.add("messages", messages);
-            
-            JsonArray claims = new JsonArray();
-            claims.add("iss");
-            claims.add("sub");
-            claims.add("name");
-            claims.add("given_name");
-            claims.add("family_name");
-            claims.add("email");
-            ltiToolConfiguration.add("claims", claims);
-            
-            registrationRequest.add("https://purl.imsglobal.org/spec/lti-tool-configuration", ltiToolConfiguration);
-            
-            // Send registration request to tool
-            HttpRequestFactory requestFactory = HTTP_TRANSPORT.createRequestFactory();
-            HttpRequest httpRequest = requestFactory.buildPostRequest(
-                new GenericUrl(toolRegistrationUrl),
-                new JsonHttpContent(new GsonFactory(), registrationRequest)
-            );
-            httpRequest.getHeaders().setContentType("application/json");
-            httpRequest.getHeaders().setAccept("application/json");
-            
-            HttpResponse httpResponse = httpRequest.execute();
-            int statusCode = httpResponse.getStatusCode();
-            String responseBody = httpResponse.parseAsString();
-            
-            if (statusCode < 200 || statusCode >= 300) {
-                throw new IOException("Registration failed with status " + statusCode + ": " + responseBody);
+            // Stage 1: Initiate registration and get the registration form
+            RegistrationValidation stage1 = initiateRegistration(targetUrl, useCaseKey);
+            if (!stage1.passed) {
+                result.setElapsedTime(new Date().getTime() - startTime.getTime());
+                result.markFailed(stage1.summary, debugDetails + "\n" + stage1.details);
+                result.save();
+                resp.sendRedirect("/test/registration?target=" + target + "&lms=" + lms);
+                return;
             }
-            
-            // Try to parse response - handle different response formats
-            JsonObject registrationResponse;
-            try {
-                registrationResponse = gson.fromJson(responseBody, JsonObject.class);
-            } catch (Exception parseException) {
-                // If not valid JSON object, create a simple response with the body
-                registrationResponse = new JsonObject();
-                registrationResponse.addProperty("client_id", "unknown");
-                registrationResponse.addProperty("response", responseBody);
-            }
-            
+
+            // Stage 2: Submit registration form with contact information
+            RegistrationValidation stage2 = submitRegistration(
+                    targetUrl,
+                    stage1.responseBody,
+                    "TestVantage Admin",
+                    "admin@testlms.edu",
+                    registrationCode,
+                    useCaseKey);
+
             result.setElapsedTime(new Date().getTime() - startTime.getTime());
-            result.setResponseText(registrationResponse.toString());
-            if (registrationResponse.has("client_id")
-                    && !registrationResponse.get("client_id").getAsString().isEmpty()
-                    && !"unknown".equals(registrationResponse.get("client_id").getAsString())) {
-                result.markPassed("Registration completed and returned a client_id.");
+            result.setResponseText(stage2.responseBody);
+            result.setDetails(stage2.details);
+            if (stage2.passed) {
+                result.markPassed(stage2.summary);
             } else {
-                result.markPassed("Registration endpoint returned a successful response.");
+                result.markFailed(stage2.summary, stage2.details);
             }
             result.save();
-
-            displayResultsPage(result, resp, baseUrl, registrationResponse);
-/*             
-            if (result.isPassedTest()) { // Display success page
-                displaySuccessPage(resp, baseUrl, registrationResponse);
-            } else { // Display error page with details}
-                displayErrorPage(resp, "Registration response does not match gold standard.");
-            }
- */           
         } catch (Exception e) {
             result.setElapsedTime(new Date().getTime() - startTime.getTime());
-            result.markError("Registration request failed.", e.getMessage());
+            result.markError("Registration validation failed with an exception.",
+                    debugDetails + "\nexception=" + e.getMessage());
             result.save();
-            displayErrorPage(resp, e.getMessage());
-        }
-    }
-    private void displayResultsPage(TestResult result, HttpServletResponse resp, String baseUrl, 
-                                    JsonObject registrationResponse) throws IOException {
-        resp.setContentType("text/html");
-        PrintWriter out = resp.getWriter();
-        
-        String clientId = registrationResponse.has("client_id") 
-            ? registrationResponse.get("client_id").getAsString() 
-            : "N/A";
-        
-        out.println("<!DOCTYPE html><html><head>");
-        out.println("<title>Registration Results</title>");
-        out.println("<style>");
-        out.println("body { font-family: Arial, sans-serif; max-width: 900px; margin: 50px auto; padding: 20px; }");
-        out.println(".success { background: #d4edda; border: 1px solid #c3e6cb; color: #155724; padding: 20px; border-radius: 5px; margin: 20px 0; text-align: center; }");
-        out.println(".error { background: #f8d7da; border: 1px solid #f5c6cb; color: #721c24; padding: 20px; border-radius: 5px; margin: 20px 0; text-align: center; }");
-        out.println(".info { background: #f5f5f5; padding: 15px; border-radius: 5px; margin: 20px 0; }");
-        out.println(".code { background: #2d2d2d; color: #f8f8f2; padding: 15px; border-radius: 5px; margin: 10px 0; overflow-x: auto; font-family: monospace; font-size: 12px; }");
-        out.println("button { background: #4CAF50; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; margin: 10px; }");
-        out.println("button:hover { background: #45a049; }");
-        out.println("</style>");
-        out.println("</head><body>");
-        
-        out.println("<div class='" + (result.isPassedTest() ? "success" : "error") + "'>");
-        out.println("<h1>" + (result.isPassedTest()?"Test Passed":"Test Failed") + "</h1>");
-        out.println("</div>");
-
-        if (result.getSummary() != null) {
-            out.println("<div class='info'><strong>Summary:</strong> " + result.getSummary() + "</div>");
         }
 
-        out.println("<div class='info'>");
-        out.println("<h3>Registration Details:</h3>");
-        out.println("<strong>Client ID:</strong> " + clientId + "<br>");
-        out.println("<strong>Platform Issuer:</strong> " + baseUrl + "<br>");
-        out.println("<strong>JWKS URI:</strong> " + baseUrl + "/jwks<br>");
-        out.println("<strong>Auth Endpoint:</strong> " + baseUrl + "/oidc/auth<br>");
-        out.println("<strong>Token Endpoint:</strong> " + baseUrl + "/oauth2/token");
-        out.println("</div>");
-
-        out.println("<div class='info'>");
-        out.println("<h3>Response</h3>");
-        out.println("<div class='code'>" + gson.toJson(registrationResponse).replace("<", "&lt;").replace(">", "&gt;") + "</div>");
-        out.println("</div>");
-
+        resp.sendRedirect("/test/registration?target=" + target + "&lms=" + lms);
+    }
+    
+    private void handleChemVantageRegistration(HttpServletRequest req, HttpServletResponse resp) throws IOException {
+        // This is a registration request from ChemVantage
+        // Respond with JSON containing client_id, deployment_id, and LMS endpoints
+        resp.setContentType("application/json");
+        
+        try {
+            // Read the request body
+            java.io.BufferedReader reader = req.getReader();
+            StringBuilder sb = new StringBuilder();
+            String line;
+            while ((line = reader.readLine()) != null) {
+                sb.append(line);
+            }
+            
+            // Build response JSON with registration details
+            com.google.gson.JsonObject responseJson = new com.google.gson.JsonObject();
+            responseJson.addProperty("client_id", "test-vantage-client-id-001");
+            
+            com.google.gson.JsonObject ltiToolConfig = new com.google.gson.JsonObject();
+            ltiToolConfig.addProperty("deployment_id", "test-vantage-deployment-001");
+            responseJson.add("https://purl.imsglobal.org/spec/lti-tool-configuration", ltiToolConfig);
+            
+            // Add LMS endpoints (placeholder values - customize as needed)
+            responseJson.addProperty("auth_login_url", "https://test-vantage.appspot.com/oidc/login");
+            responseJson.addProperty("auth_token_url", "https://test-vantage.appspot.com/oauth2/token");
+            responseJson.addProperty("key_set_url", "https://test-vantage.appspot.com/jwks");
+            
+            resp.setStatus(HttpServletResponse.SC_OK);
+            resp.getWriter().write(new com.google.gson.Gson().toJson(responseJson));
+        } catch (Exception e) {
+            resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+            com.google.gson.JsonObject errorJson = new com.google.gson.JsonObject();
+            errorJson.addProperty("error", "Invalid registration request: " + e.getMessage());
+            resp.getWriter().write(new com.google.gson.Gson().toJson(errorJson));
+        }
     }
 
+    private RegistrationValidation initiateRegistration(String targetUrl, String useCaseKey) throws IOException {
+        String endpointUrl = targetUrl + "/lti/registration";
         
-/*  private void displaySuccessPage(HttpServletResponse resp, String baseUrl, 
-                                    JsonObject registrationResponse) throws IOException {
-        resp.setContentType("text/html");
-        PrintWriter out = resp.getWriter();
+        // Extract LMS type from useCaseKey (format: "target/lms")
+        String lmsType = extractLmsType(useCaseKey);
         
-        String clientId = registrationResponse.has("client_id") 
-            ? registrationResponse.get("client_id").getAsString() 
-            : "N/A";
+        // The openid_configuration parameter points to a configuration endpoint on the TESTER
+        // ChemVantage will fetch the tester's configuration from this URL
+        // Include the LMS type as a query parameter so the config reflects the correct product_family_code
+        String openidConfigUrl = "https://test-vantage.appspot.com/.well-known/openid-configuration?lms=" + lmsType;
         
-        out.println("<!DOCTYPE html><html><head>");
-        out.println("<title>Registration Successful</title>");
-        out.println("<style>");
-        out.println("body { font-family: Arial, sans-serif; max-width: 900px; margin: 50px auto; padding: 20px; }");
-        out.println(".success { background: #d4edda; border: 1px solid #c3e6cb; color: #155724; padding: 20px; border-radius: 5px; margin: 20px 0; text-align: center; }");
-        out.println(".info { background: #f5f5f5; padding: 15px; border-radius: 5px; margin: 20px 0; }");
-        out.println(".code { background: #2d2d2d; color: #f8f8f2; padding: 15px; border-radius: 5px; margin: 10px 0; overflow-x: auto; font-family: monospace; font-size: 12px; }");
-        out.println("button { background: #4CAF50; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; margin: 10px; }");
-        out.println("button:hover { background: #45a049; }");
-        out.println("</style>");
-        out.println("</head><body>");
+        HttpRequestFactory requestFactory = HTTP_TRANSPORT.createRequestFactory();
         
-        out.println("<div class='success'>");
-        out.println("<h1>✓ Registration Successful!</h1>");
-        out.println("<p>Test Vantage has been registered with ChemVantage.</p>");
-        out.println("</div>");
+        // Build GET request with openid_configuration as a query parameter
+        GenericUrl url = new GenericUrl(endpointUrl);
+        url.put("openid_configuration", openidConfigUrl);
         
-        out.println("<div class='info'>");
-        out.println("<h3>Registration Details:</h3>");
-        out.println("<strong>Client ID:</strong> " + clientId + "<br>");
-        out.println("<strong>Platform Issuer:</strong> " + baseUrl + "<br>");
-        out.println("<strong>JWKS URI:</strong> " + baseUrl + "/jwks<br>");
-        out.println("<strong>Auth Endpoint:</strong> " + baseUrl + "/oidc/auth<br>");
-        out.println("<strong>Token Endpoint:</strong> " + baseUrl + "/oauth2/token");
-        out.println("</div>");
-        
-        out.println("<div class='info'>");
-        out.println("<h3>Full Response from ChemVantage:</h3>");
-        out.println("<div class='code'>");
-        out.println(gson.toJson(registrationResponse).replace("<", "&lt;").replace(">", "&gt;"));
-        out.println("</div>");
-        out.println("</div>");
-        
-        out.println("<div style='text-align: center;'>");
-        out.println("<button onclick='window.close()'>Close Window</button>");
-        out.println("<button onclick=\"window.location='/'\">Return to Home</button>");
-        out.println("</div>");
-        
-        out.println("</body></html>");
-    }
-*/
+        HttpRequest request = requestFactory.buildGetRequest(url);
+        request.setThrowExceptionOnExecuteError(false);
 
-    private void displayErrorPage(HttpServletResponse resp, String errorMessage) 
+        HttpResponse response = request.execute();
+        int statusCode = response.getStatusCode();
+        String contentType = response.getContentType();
+        String body = response.parseAsString();
+
+        if (statusCode != HttpServletResponse.SC_OK) {
+            return new RegistrationValidation(false, body,
+                "Stage 1: Registration initiation rejected by target (HTTP " + statusCode + ").",
+                "Target rejected GET request to " + endpointUrl + "\n"
+                    + "openid_configuration parameter: " + openidConfigUrl + "\n"
+                    + "Expected HTTP 200 but received HTTP " + statusCode + ".\n"
+                    + "Response:\n" + fullResponseForFailure(body));
+        }
+
+        if (contentType == null || !contentType.toLowerCase().contains("html")) {
+            return new RegistrationValidation(false, body,
+                "Stage 1: Registration response was not HTML.",
+                "Expected an HTML response but Content-Type was: " + contentType + "\n"
+                    + "Response:\n" + fullResponseForFailure(body));
+        }
+
+        if (body == null || body.trim().isEmpty()) {
+            return new RegistrationValidation(false, body,
+                "Stage 1: Registration response was empty.",
+                "Expected HTML content but response body was empty.");
+        }
+
+        String expectedText = "</div><h1>LTI Advantage Dynamic Registration";
+        if (!body.contains(expectedText)) {
+            return new RegistrationValidation(false, body,
+                "Stage 1: Registration page did not contain expected text.",
+                "Expected page text: \"" + expectedText + "\"\n"
+                    + "Response:\n" + fullResponseForFailure(body));
+        }
+
+        String summary = "Stage 1: Registration form loaded successfully with expected text.";
+        String details = "Request endpoint: " + endpointUrl + " (GET)\n"
+                + "openid_configuration parameter (tester's config URL): " + openidConfigUrl + "\n"
+                + "Use case: " + useCaseKey + "\n"
+                + "Expected page text: \"" + expectedText + "\"\n"
+                + "Response length: " + body.length() + " characters\n"
+                + "Response preview: " + summarizeBody(body);
+        return new RegistrationValidation(true, body, summary, details);
+    }
+
+    private RegistrationValidation submitRegistration(
+            String targetUrl,
+            String stage1Body,
+            String contactName,
+            String contactEmail,
+            String registrationCode,
+            String useCaseKey)
             throws IOException {
-        resp.setContentType("text/html");
-        PrintWriter out = resp.getWriter();
         
-        out.println("<!DOCTYPE html><html><head>");
-        out.println("<title>Registration Failed</title>");
-        out.println("<style>");
-        out.println("body { font-family: Arial, sans-serif; max-width: 900px; margin: 50px auto; padding: 20px; }");
-        out.println(".error { background: #f8d7da; border: 1px solid #f5c6cb; color: #721c24; padding: 20px; border-radius: 5px; margin: 20px 0; text-align: center; }");
-        out.println(".details { background: #f5f5f5; padding: 15px; border-radius: 5px; margin: 20px 0; }");
-        out.println(".code { background: #2d2d2d; color: #f8f8f2; padding: 15px; border-radius: 5px; margin: 10px 0; overflow-x: auto; font-family: monospace; font-size: 12px; white-space: pre-wrap; word-wrap: break-word; }");
-        out.println("button { background: #4CAF50; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; margin: 10px; }");
-        out.println("</style>");
-        out.println("</head><body>");
+        // Extract form action from stage 1 response
+        String formAction = extractFormAction(stage1Body);
+        if (formAction == null || formAction.isEmpty()) {
+            return new RegistrationValidation(false, stage1Body,
+                "Stage 2: Could not find form action in registration form.",
+                "Expected HTML form with action attribute in Stage 1 response.");
+        }
         
-        out.println("<div class='error'>");
-        out.println("<h1>✗ Registration Failed</h1>");
-        out.println("<p>Unable to complete registration with ChemVantage.</p>");
-        out.println("</div>");
+        // Resolve relative URLs to absolute
+        if (formAction.startsWith("/")) {
+            formAction = targetUrl + formAction;
+        } else if (!formAction.startsWith("http")) {
+            // Relative path without leading slash
+            int lastSlash = targetUrl.lastIndexOf("/");
+            formAction = targetUrl.substring(0, lastSlash) + "/" + formAction;
+        }
         
-        out.println("<div class='details'>");
-        out.println("<h3>Error Details:</h3>");
-        out.println("<div class='code'>" + errorMessage.replace("<", "&lt;").replace(">", "&gt;") + "</div>");
-        out.println("</div>");
+        // Extract registration_token and openid_configuration from stage 1 response
+        String registrationToken = extractFormHiddenField(stage1Body, "registration_token");
+        String openidConfigUrl = extractFormHiddenField(stage1Body, "openid_configuration");
         
-        out.println("<div class='details'>");
-        out.println("<h3>Troubleshooting:</h3>");
-        out.println("<ul>");
-        out.println("<li>Verify the ChemVantage registration URL is correct</li>");
-        out.println("<li>Check that ChemVantage's registration endpoint is accessible</li>");
-        out.println("<li>Ensure ChemVantage expects the LTI 1.3 Dynamic Registration format</li>");
-        out.println("<li>Check the error message above for specific details</li>");
-        out.println("</ul>");
-        out.println("</div>");
+        // If openid_configuration is not found in the form, construct it (fallback)
+        if (openidConfigUrl == null || openidConfigUrl.isEmpty()) {
+            String lmsType = extractLmsType(useCaseKey);
+            openidConfigUrl = "https://test-vantage.appspot.com/.well-known/openid-configuration?lms=" + lmsType;
+        }
         
-        out.println("<div style='text-align: center;'>");
-        out.println("<button onclick=\"window.location='/registration?action=start'\">Try Again</button>");
-        out.println("<button onclick=\"window.location='/'\">Return to Home</button>");
-        out.println("</div>");
+        String endpointUrl = formAction;
+        HttpRequestFactory requestFactory = HTTP_TRANSPORT.createRequestFactory();
+
+        Map<String, String> params = new HashMap<>();
+        params.put("name", contactName != null ? contactName : "");
+        params.put("email", contactEmail != null ? contactEmail : "");
+        params.put("org", "ChemVantage Regression Tester");
+        params.put("url", "https://test-vantage.appspot.com");
+        params.put("AcceptChemVantageTOS", "true");
+        params.put("openid_configuration", openidConfigUrl);
+        if (registrationToken != null && !registrationToken.isEmpty()) {
+            params.put("registration_token", registrationToken);
+        }
+        if (useCaseKey.startsWith("dev") && registrationCode != null && !registrationCode.isEmpty()) {
+            params.put("reg_code", registrationCode);
+        }
+
+        HttpRequest request = requestFactory.buildPostRequest(
+                new GenericUrl(endpointUrl),
+                new UrlEncodedContent(params));
+        request.setThrowExceptionOnExecuteError(false);
+
+        HttpResponse response = request.execute();
+        int statusCode = response.getStatusCode();
+        String contentType = response.getContentType();
+        String body = response.parseAsString();
+
+        if (statusCode != HttpServletResponse.SC_OK) {
+            return new RegistrationValidation(false, body,
+                "Stage 2: Registration submission rejected by target (HTTP " + statusCode + ").",
+                "Target rejected request to " + endpointUrl + "\n"
+                    + "Expected HTTP 200 but received HTTP " + statusCode + ".\n"
+                    + "Response:\n" + fullResponseForFailure(body));
+        }
+
+        if (contentType == null || !contentType.toLowerCase().contains("html")) {
+            return new RegistrationValidation(false, body,
+                "Stage 2: Registration confirmation response was not HTML.",
+                "Expected an HTML response but Content-Type was: " + contentType);
+        }
+
+        if (body == null || body.trim().isEmpty()) {
+            return new RegistrationValidation(false, body,
+                "Stage 2: Registration confirmation response was empty.",
+                "Expected HTML content but response body was empty.");
+        }
+
+        String expectedText = getExpectedConfirmationText(useCaseKey);
+        if (!body.contains(expectedText)) {
+            return new RegistrationValidation(false, body,
+                "Stage 2: Registration confirmation page did not contain expected text.",
+                "Use case: " + useCaseKey + "\n"
+                    + "Expected page text: \"" + expectedText + "\"\n"
+                    + "Response:\n" + fullResponseForFailure(body));
+        }
+
+        String summary = "Stage 2: Registration submitted and confirmed successfully.";
+        String details = "Request endpoint: " + endpointUrl + "\n"
+                + "Use case: " + useCaseKey + "\n"
+                + "Contact: " + contactEmail + "\n"
+                + "Expected confirmation text: \"" + expectedText + "\"\n"
+                + "Response length: " + body.length() + " characters\n"
+                + "Response preview: " + summarizeBody(body);
+        return new RegistrationValidation(true, body, summary, details);
+    }
+    
+    private String extractLmsType(String useCaseKey) {
+        // Extract LMS from useCaseKey format "target/lms"
+        int slashIndex = useCaseKey.indexOf("/");
+        if (slashIndex >= 0 && slashIndex < useCaseKey.length() - 1) {
+            return useCaseKey.substring(slashIndex + 1);
+        }
+        return "canvas";
+    }
+    
+    private String extractFormHiddenField(String html, String fieldName) {
+        if (html == null || html.isEmpty()) {
+            return null;
+        }
         
-        out.println("</body></html>");
+        // Look for hidden input field with name and value (quoted)
+        java.util.regex.Pattern pattern = java.util.regex.Pattern.compile(
+            "<input[^>]*name=[\"']?" + java.util.regex.Pattern.quote(fieldName) + "[\"']?[^>]*value=[\"']([^\"']*)[\"']",
+            java.util.regex.Pattern.CASE_INSENSITIVE);
+        java.util.regex.Matcher matcher = pattern.matcher(html);
+        
+        if (matcher.find()) {
+            return matcher.group(1);
+        }
+        
+        // Also try with value before name (quoted)
+        pattern = java.util.regex.Pattern.compile(
+            "<input[^>]*value=[\"']([^\"']*)[\"'][^>]*name=[\"']?" + java.util.regex.Pattern.quote(fieldName) + "[\"']?",
+            java.util.regex.Pattern.CASE_INSENSITIVE);
+        matcher = pattern.matcher(html);
+        
+        if (matcher.find()) {
+            return matcher.group(1);
+        }
+        
+        // Try unquoted value (for URLs with query parameters)
+        // Match: name=field_name ... value=url_without_quotes
+        pattern = java.util.regex.Pattern.compile(
+            "<input[^>]*name=[\"']?" + java.util.regex.Pattern.quote(fieldName) + "[\"']?[^>]*value=([^\\s>]+)",
+            java.util.regex.Pattern.CASE_INSENSITIVE);
+        matcher = pattern.matcher(html);
+        
+        if (matcher.find()) {
+            String value = matcher.group(1);
+            // Remove trailing > if present
+            if (value.endsWith(">")) {
+                value = value.substring(0, value.length() - 1);
+            }
+            return value;
+        }
+        
+        // Also try value before name (unquoted)
+        pattern = java.util.regex.Pattern.compile(
+            "<input[^>]*value=([^\\s>]+)[^>]*name=[\"']?" + java.util.regex.Pattern.quote(fieldName) + "[\"']?",
+            java.util.regex.Pattern.CASE_INSENSITIVE);
+        matcher = pattern.matcher(html);
+        
+        if (matcher.find()) {
+            String value = matcher.group(1);
+            // Remove trailing > if present
+            if (value.endsWith(">")) {
+                value = value.substring(0, value.length() - 1);
+            }
+            return value;
+        }
+        
+        return null;
+    }
+
+    private String getExpectedConfirmationText(String useCaseKey) {
+        if (useCaseKey.contains("dev") || useCaseKey.contains("canvas")) {
+            return "Your Deployment is Active";
+        }
+        return "Your Deployment is Currently Under Review";
+    }
+
+    private String summarizeBody(String body) {
+        if (body == null) {
+            return "(empty)";
+        }
+        String compact = body.replaceAll("\\s+", " ").trim();
+        int maxLen = 400;
+        return compact.length() <= maxLen ? compact : compact.substring(0, maxLen) + "...";
+    }
+
+    private String fullResponseForFailure(String body) {
+        return body == null ? "(empty)" : body;
+    }
+
+    private String trimToNull(String value) {
+        if (value == null) {
+            return null;
+        }
+        String trimmed = value.trim();
+        return trimmed.isEmpty() ? null : trimmed;
+    }
+    
+    private String extractFormAction(String html) {
+        if (html == null || html.isEmpty()) {
+            return null;
+        }
+        
+        // Use regex to find form action - handles quoted and unquoted values
+        // Matches: action="..." action='...' or action=...
+        java.util.regex.Pattern pattern = java.util.regex.Pattern.compile(
+            "<form[^>]+action=([\"']?)([^\"'\\s>]+)\\1",
+            java.util.regex.Pattern.CASE_INSENSITIVE);
+        java.util.regex.Matcher matcher = pattern.matcher(html);
+        
+        if (matcher.find()) {
+            return matcher.group(2);
+        }
+        
+        return null;
+    }
+
+    private String safe(String value) {
+        return value == null ? "N/A" : escapeHtml(value);
+    }
+
+    private String escapeHtml(String value) {
+        return value.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;");
+    }
+
+    private static final class RegistrationValidation {
+        private final boolean passed;
+        private final String responseBody;
+        private final String summary;
+        private final String details;
+
+        private RegistrationValidation(boolean passed, String responseBody, String summary, String details) {
+            this.passed = passed;
+            this.responseBody = responseBody;
+            this.summary = summary;
+            this.details = details;
+        }
     }
 }

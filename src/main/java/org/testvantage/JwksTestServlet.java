@@ -5,6 +5,7 @@ import java.io.PrintWriter;
 import java.util.Date;
 
 import javax.servlet.ServletException;
+import javax.servlet.annotation.WebServlet;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
@@ -22,6 +23,7 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 
+@WebServlet(urlPatterns = "/test/jwks")
 public class JwksTestServlet extends HttpServlet {
 
 	private static final Gson GSON = new Gson();

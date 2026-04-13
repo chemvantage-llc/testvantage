@@ -30,15 +30,8 @@
         <url-pattern>/</url-pattern>
     </servlet-mapping>
 
-    <!-- Dynamic Registration Servlet -->
-    <servlet>
-        <servlet-name>Registration</servlet-name>
-        <servlet-class>org.testvantage.RegistrationServlet</servlet-class>
-    </servlet>
-    <servlet-mapping>
-        <servlet-name>Registration</servlet-name>
-        <url-pattern>/registration</url-pattern>
-    </servlet-mapping>
+    <!-- Dynamic Registration Test Suite -->
+    <!-- Configured via @WebServlet annotation in RegistrationServlet.java -->
 
     <!-- OIDC Login Initiation -->
     <servlet>
@@ -131,34 +124,13 @@
     </servlet-mapping>
 
     <!-- JWKS Test Suite -->
-    <servlet>
-        <servlet-name>JwksTest</servlet-name>
-        <servlet-class>org.testvantage.JwksTestServlet</servlet-class>
-    </servlet>
-    <servlet-mapping>
-        <servlet-name>JwksTest</servlet-name>
-        <url-pattern>/test/jwks</url-pattern>
-    </servlet-mapping>
+    <!-- Configured via @WebServlet annotation in JwksTestServlet.java -->
 
     <!-- Auth Token Test Suite -->
-    <servlet>
-        <servlet-name>AuthTokenTest</servlet-name>
-        <servlet-class>org.testvantage.AuthTokenTestServlet</servlet-class>
-    </servlet>
-    <servlet-mapping>
-        <servlet-name>AuthTokenTest</servlet-name>
-        <url-pattern>/test/auth-token</url-pattern>
-    </servlet-mapping>
+    <!-- Configured via @WebServlet annotation in AuthTokenTestServlet.java -->
 
     <!-- Launch Test Suite -->
-    <servlet>
-        <servlet-name>LaunchTest</servlet-name>
-        <servlet-class>org.testvantage.LaunchTestServlet</servlet-class>
-    </servlet>
-    <servlet-mapping>
-        <servlet-name>LaunchTest</servlet-name>
-        <url-pattern>/test/launch</url-pattern>
-    </servlet-mapping>
+    <!-- Configured via @WebServlet annotation in LaunchTestServlet.java -->
 
     <!-- Test Status API -->
     <servlet>

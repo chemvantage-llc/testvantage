@@ -81,19 +81,25 @@ public class OIDCConfigurationServlet extends HttpServlet {
             "email"
         }));
         
-        // LTI specific
+        // LTI specific - get LMS type from query parameter
+        String lmsType = req.getParameter("lms");
         config.add("https://purl.imsglobal.org/spec/lti-platform-configuration", 
-                  createLtiPlatformConfiguration(baseUrl));
+                  createLtiPlatformConfiguration(baseUrl, lmsType));
         
         resp.setContentType("application/json");
         resp.setHeader("Cache-Control", "max-age=3600");
         resp.getWriter().write(gson.toJson(config));
     }
     
-    private JsonObject createLtiPlatformConfiguration(String baseUrl) {
+    private JsonObject createLtiPlatformConfiguration(String baseUrl, String lmsType) {
         JsonObject ltiConfig = new JsonObject();
         
-        ltiConfig.addProperty("product_family_code", "test-vantage");
+        // product_family_code should match the LMS type (canvas, moodle, etc.)
+        // Default to canvas if not specified
+        if (lmsType == null || lmsType.isEmpty()) {
+            lmsType = "canvas";
+        }
+        ltiConfig.addProperty("product_family_code", lmsType);
         ltiConfig.addProperty("version", "1.0");
         
         // Messages supported

@@ -57,7 +57,7 @@ public class HomeServlet extends HttpServlet {
         out.println("<h2>Platform Endpoints (This App)</h2>");
         out.println("<table>");
         out.println("<tr><th>Endpoint</th><th>URL</th><th>Purpose</th></tr>");
-        out.println("<tr><td>Registration URL</td><td><code>" + baseUrl + "/registration</code></td><td>Dynamic Registration initiation</td></tr>");
+        out.println("<tr><td>Registration URL</td><td><code>" + baseUrl + "/test/registration</code></td><td>Dynamic Registration initiation</td></tr>");
         out.println("<tr><td>OIDC Login</td><td><code>" + baseUrl + "/oidc/login</code></td><td>OIDC authentication initiation</td></tr>");
         out.println("<tr><td>OIDC Auth Response</td><td><code>" + baseUrl + "/oidc/auth</code></td><td>Redirect URI for authentication</td></tr>");
         out.println("<tr><td>JWKS</td><td><code>" + baseUrl + "/jwks</code></td><td>Public key set</td></tr>");
@@ -73,7 +73,7 @@ public class HomeServlet extends HttpServlet {
         
         out.println("<h3>1. Dynamic Registration</h3>");
         out.println("<p>Initiate the Dynamic Registration flow with ChemVantage.</p>");
-        out.println("<button onclick=\"window.location='/registration?action=start'\">Start Dynamic Registration</button>");
+        out.println("<button onclick=\"window.location='/test/registration?action=start'\">Start Dynamic Registration</button>");
         out.println("<div class='info' style='margin-top: 10px;'>");
         out.println("<strong>Note:</strong> This will POST platform registration data to ChemVantage's registration endpoint.");
         out.println("</div>");

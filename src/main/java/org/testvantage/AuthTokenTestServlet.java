@@ -7,6 +7,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Date;
 
 import javax.servlet.ServletException;
+import javax.servlet.annotation.WebServlet;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
@@ -21,6 +22,7 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 
+@WebServlet(urlPatterns = "/test/auth-token")
 public class AuthTokenTestServlet extends HttpServlet {
 
     private static final HttpTransport HTTP_TRANSPORT = new NetHttpTransport();

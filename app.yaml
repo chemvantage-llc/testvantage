@@ -1,10 +1,6 @@
-runtime: java11
-instance_class: F2
-
-entrypoint: 'java -Xmx256m -jar /workspace/target/test-vantage-1.0-SNAPSHOT.jar'
+runtime: java21
 
 automatic_scaling:
-  target_cpu_utilization: 0.65
   min_instances: 0
   max_instances: 10
 
