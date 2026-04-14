@@ -205,7 +205,7 @@ public class LaunchTestServlet extends HttpServlet {
         // Standard OIDC claims
         claims.put("iss", issuer);
         claims.put("sub", scenario.userId);
-        claims.put("aud", "test-vantage-client");
+        claims.put("aud", "test-vantage-client-id-001");
         claims.put("exp", now + 3600);
         claims.put("iat", now);
         claims.put("nonce", "test-nonce-" + System.currentTimeMillis());
@@ -213,7 +213,7 @@ public class LaunchTestServlet extends HttpServlet {
         // LTI specific claims
         claims.put("https://purl.imsglobal.org/spec/lti/claim/message_type", "LtiResourceLinkRequest");
         claims.put("https://purl.imsglobal.org/spec/lti/claim/version", "1.3.0");
-        claims.put("https://purl.imsglobal.org/spec/lti/claim/deployment_id", "1");
+        claims.put("https://purl.imsglobal.org/spec/lti/claim/deployment_id", "test-vantage-deployment-001");
         claims.put("https://purl.imsglobal.org/spec/lti/claim/target_link_uri", 
                   "https://www.chemvantage.org/lti/launch");
 
@@ -265,24 +265,36 @@ public class LaunchTestServlet extends HttpServlet {
         return token;
     }
 
-            private LaunchValidation validateLaunchWorkflow(
-                String targetBaseUrl,
-                String idToken,
-                String state,
-                String authRedirectUrl,
-                String useCase)
-            throws IOException {
+    private LaunchValidation validateLaunchWorkflow(
+        String targetBaseUrl,
+        String idToken,
+        String state,
+        String authRedirectUrl,
+        String useCase)
+    throws IOException {
         String endpointUrl = targetBaseUrl + "/lti/launch";
         HttpRequestFactory requestFactory = HTTP_TRANSPORT.createRequestFactory();
-            Map<String, String> formFields = new HashMap<>();
-            formFields.put("id_token", idToken);
-            formFields.put("state", state);
-            HttpRequest request = requestFactory.buildPostRequest(new GenericUrl(endpointUrl), new UrlEncodedContent(formFields));
+        Map<String, String> formFields = new HashMap<>();
+        formFields.put("id_token", idToken);
+        formFields.put("state", state);
+        HttpRequest request = requestFactory.buildPostRequest(new GenericUrl(endpointUrl), new UrlEncodedContent(formFields));
         request.getHeaders().setAccept("text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8");
         request.setThrowExceptionOnExecuteError(false);
+        request.setFollowRedirects(false);
 
         HttpResponse response = request.execute();
         int statusCode = response.getStatusCode();
+        
+        // Handle redirects by following as GET (browser behavior for POST->redirect)
+        if ((statusCode == 301 || statusCode == 302 || statusCode == 303) && response.getHeaders().getLocation() != null) {
+            String redirectUrl = response.getHeaders().getLocation();
+            HttpRequest redirectRequest = requestFactory.buildGetRequest(new GenericUrl(redirectUrl));
+            redirectRequest.getHeaders().setAccept("text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8");
+            redirectRequest.setThrowExceptionOnExecuteError(false);
+            response = redirectRequest.execute();
+            statusCode = response.getStatusCode();
+        }
+
         String contentType = response.getContentType();
         String body = response.parseAsString();
         String idTokenHeader = getJwtHeaderForDebug(idToken);
@@ -299,7 +311,7 @@ public class LaunchTestServlet extends HttpServlet {
 
         if (contentType == null || !contentType.toLowerCase().contains("html")) {
             return new LaunchValidation(false, body,
-                    "Launch response was not HTML.",
+                "Launch response was not HTML.",
                 "Auth redirect URL: " + safe(authRedirectUrl) + "\n"
                     + "id_token_header: " + safe(idTokenHeader) + "\n"
                     + "Expected an HTML response but Content-Type was: " + contentType + "\n"
@@ -343,7 +355,7 @@ public class LaunchTestServlet extends HttpServlet {
         HttpRequestFactory requestFactory = HTTP_TRANSPORT.createRequestFactory();
         GenericUrl authTokenUrl = new GenericUrl(endpointUrl);
         authTokenUrl.put("iss", issuer);
-        authTokenUrl.put("login_hint", "1");
+        authTokenUrl.put("login_hint", "test-vantage-deployment-001");
         authTokenUrl.put("target_link_uri", targetLinkUri);
 
         HttpRequest request = requestFactory.buildGetRequest(authTokenUrl);

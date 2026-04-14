@@ -80,7 +80,7 @@ public class AuthTokenTestServlet extends HttpServlet {
         out.println("<input type='text' name='issuer' id='issuer' value='" + safeAttribute(suggestedIssuer) + "'>");
 
         out.println("<label for='deploymentId'>Deployment ID (login_hint)</label>");
-        out.println("<input type='text' name='deploymentId' id='deploymentId' value='1'>");
+        out.println("<input type='text' name='deploymentId' id='deploymentId' value='test-vantage-deployment-001'>");
 
         out.println("<label for='launchType'>Target Link Endpoint</label>");
         out.println("<select name='launchType' id='launchType'>");
@@ -123,7 +123,7 @@ public class AuthTokenTestServlet extends HttpServlet {
             issuer = "https://test-vantage.appspot.com";
         }
         if (deploymentId == null) {
-            deploymentId = "1";
+            deploymentId = "test-vantage-deployment-001";
         }
         if (launchType == null || (!"launch".equals(launchType) && !"deeplinks".equals(launchType))) {
             launchType = "launch";
