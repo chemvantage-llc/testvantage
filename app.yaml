@@ -1,4 +1,4 @@
-runtime: java21
+runtime: java17
 
 automatic_scaling:
   min_instances: 0
