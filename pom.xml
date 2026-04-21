@@ -120,7 +120,7 @@
                 <version>2.4.4</version>
                 <configuration>
                     <projectId>test-vantage</projectId>
-                    <version>1</version>
+                    <version>GCLOUD_CONFIG</version>
                 </configuration>
             </plugin>
             <plugin>

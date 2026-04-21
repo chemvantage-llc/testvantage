@@ -94,13 +94,15 @@ public class RegistrationServlet extends HttpServlet {
 
         out.println("<div class='panel info'>");
         out.println("<strong>Stage 1 (Form Request):</strong> Must return HTTP 200 and HTML with 'LTI Advantage Dynamic Registration'<br>");
-        out.println("<strong>Stage 2 (Form Submission):</strong> Expected text depends on target and LMS:<br>");
+        out.println("<strong>Stage 2 (Form Submission):</strong> Expected text: 'Your Deployment is Active'<br/>");   // depends on target and LMS:<br>");
+        /*
         out.println("<ul>");
         out.println("<li><strong>prod/canvas:</strong> 'Your Deployment is Active'</li>");
-        out.println("<li><strong>prod/moodle:</strong> 'Your Deployment is Currently Under Review'</li>");
+        out.println("<li><strong>prod/moodle:</strong> 'Your Deployment is Active'</li>");
         out.println("<li><strong>dev/canvas:</strong> 'Your Deployment is Active'</li>");
         out.println("<li><strong>dev/moodle:</strong> 'Your Deployment is Active'</li>");
         out.println("</ul>");
+        */
         out.println("</div>");
 
         if (result != null) {
@@ -483,10 +485,13 @@ public class RegistrationServlet extends HttpServlet {
     }
 
     private String getExpectedConfirmationText(String useCaseKey) {
+        return "Your Deployment is Active";
+        /* 
         if (useCaseKey.contains("dev") || useCaseKey.contains("canvas")) {
             return "Your Deployment is Active";
         }
         return "Your Deployment is Currently Under Review";
+        */
     }
 
     private String summarizeBody(String body) {
