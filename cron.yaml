@@ -1,0 +1,6 @@
+cron:
+- description: "Daily Test Suite Execution"
+  url: /test/suite?run=true
+  schedule: every day 02:00
+  timezone: America/New_York
+  target: default

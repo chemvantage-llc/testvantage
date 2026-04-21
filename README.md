@@ -113,6 +113,37 @@ mvn appengine:run
 
 The app will be available at `http://localhost:8080`
 
+## Automated Testing
+
+### Test Suite
+
+The application includes a comprehensive automated test suite that validates all ChemVantage endpoints:
+
+- **Endpoint**: `/test/suite`
+- **Tests**: 8 total (Registration × 2, Launch × 4, Auth Token, JWKS)
+- **Documentation**: See [TEST_SUITE_GUIDE.md](TEST_SUITE_GUIDE.md)
+
+### Scheduled Execution
+
+A cron job automatically runs the full test suite daily at 2:00 AM Eastern Time:
+
+```bash
+# Deploy cron schedule
+gcloud app deploy cron.yaml
+
+# View cron jobs
+gcloud app cron list
+
+# Manually trigger
+gcloud app cron run "Daily Test Suite Execution"
+```
+
+See [CRON_SETUP.md](CRON_SETUP.md) for complete cron job configuration and management.
+
+### Manual Testing
+
+Visit `https://test-vantage.appspot.com/test/suite` and click "Run Complete Test Suite" to execute all tests on demand.
+
 ## Testing Workflow
 
 ### 1. Dynamic Registration

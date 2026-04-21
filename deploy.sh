@@ -60,6 +60,15 @@ mvn clean package -DskipTests
 echo "Step 6: Deploying to App Engine..."
 mvn appengine:deploy
 
+# Deploy cron configuration
+echo "Step 7: Deploying cron schedule..."
+if [ -f "cron.yaml" ]; then
+    gcloud app deploy cron.yaml --quiet
+    echo "✓ Cron schedule deployed"
+else
+    echo "⚠ No cron.yaml found, skipping cron deployment"
+fi
+
 # Get the deployed URL
 APP_URL=$(gcloud app browse --no-launch-browser 2>&1 | grep -o 'https://[^ ]*' || echo "https://${PROJECT_ID}.appspot.com")
 
@@ -81,6 +90,9 @@ echo "Next Steps:"
 echo "1. Visit $APP_URL to access the test interface"
 echo "2. Configure ChemVantage with the platform details above"
 echo "3. Run regression tests"
+echo "4. View automated test results at $APP_URL/test/suite"
+echo "5. Cron job runs daily at 2:00 AM ET"
 echo ""
 echo "View logs with: gcloud app logs tail -s default"
+echo "View cron jobs with: gcloud app cron list"
 echo "========================================="
