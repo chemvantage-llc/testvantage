@@ -185,9 +185,8 @@ public class TestSuiteServlet extends HttpServlet {
      * Run all tests in the suite by making HTTP requests to individual test servlets
      */
     private void runAllTests(HttpServletRequest req) {
-        String baseUrl = req.getScheme() + "://" + req.getServerName()
-                + (req.getServerPort() != 80 && req.getServerPort() != 443 ? ":" + req.getServerPort() : "");
-        String issuer = baseUrl;
+        // Use the full public URL for all requests (issuer must match registered deployment)
+        String baseUrl = "https://test-vantage.appspot.com";
 
         try {
             // Registration tests: prod/canvas and prod/moodle
@@ -195,15 +194,18 @@ public class TestSuiteServlet extends HttpServlet {
             triggerTestViaPost(baseUrl + "/test/registration", "target", "prod", "lms", "moodle");
 
             // Launch tests: 4 variations
-            triggerTestViaPost(baseUrl + "/test/launch", "target", "prod", "role", "instructor", "resourceLinkId", "test-resource-link-001", "issuer", issuer);
-            triggerTestViaPost(baseUrl + "/test/launch", "target", "prod", "role", "instructor", "resourceLinkId", "test-resource-link-002", "issuer", issuer);
-            triggerTestViaPost(baseUrl + "/test/launch", "target", "prod", "role", "student", "resourceLinkId", "test-resource-link-001", "issuer", issuer);
-            triggerTestViaPost(baseUrl + "/test/launch", "target", "prod", "role", "student", "resourceLinkId", "test-resource-link-002", "issuer", issuer);
+            triggerTestViaPost(baseUrl + "/test/launch", "target", "prod", "role", "instructor", "resourceLinkId", "test-resource-link-001", "issuer", baseUrl);
+            triggerTestViaPost(baseUrl + "/test/launch", "target", "prod", "role", "instructor", "resourceLinkId", "test-resource-link-002", "issuer", baseUrl);
+            triggerTestViaPost(baseUrl + "/test/launch", "target", "prod", "role", "student", "resourceLinkId", "test-resource-link-001", "issuer", baseUrl);
+            triggerTestViaPost(baseUrl + "/test/launch", "target", "prod", "role", "student", "resourceLinkId", "test-resource-link-002", "issuer", baseUrl);
 
             // Auth token test
-            triggerTestViaPost(baseUrl + "/test/auth-token", "target", "prod", "issuer", issuer, "deploymentId", "test-vantage-deployment-001", "launchType", "launch");
+            triggerTestViaPost(baseUrl + "/test/auth-token", "target", "prod", "issuer", baseUrl, "deploymentId", "test-vantage-deployment-001", "launchType", "launch");
             // Run JWKS test
             triggerTestViaPost(baseUrl + "/test/jwks", "target", "prod");
+            
+            // Wait for test servlets to complete and save results to datastore
+            Thread.sleep(5000);
         } catch (Exception e) {
             System.err.println("Error running test suite: " + e.getMessage());
             e.printStackTrace();
