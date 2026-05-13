@@ -49,6 +49,9 @@ public class LaunchTestServlet extends HttpServlet {
         if (selectedUseCase == null || selectedUseCase.isEmpty()) {
             selectedUseCase = "instructor/known_assignment";
         }
+        
+        String testIframeParam = req.getParameter("testIframe");
+        boolean testIframe = "true".equals(testIframeParam);
 
         String baseUrl = req.getScheme() + "://" + req.getServerName()
                 + (req.getServerPort() != 80 && req.getServerPort() != 443 ? ":" + req.getServerPort() : "");
@@ -67,8 +70,13 @@ public class LaunchTestServlet extends HttpServlet {
         out.println(".code { background: #2d2d2d; color: #f8f8f2; padding: 15px; border-radius: 5px; white-space: pre-wrap; word-wrap: break-word; }");
         out.println("button { background: #1f6feb; color: white; padding: 10px 18px; border: none; border-radius: 4px; cursor: pointer; }");
         out.println("input, select { padding: 8px; margin: 4px 0 12px 0; width: 100%; box-sizing: border-box; }");
+        out.println("input[type='checkbox'] { width: auto; padding: 0; margin: 0 8px 0 0; }");
         out.println("label { display: block; font-weight: bold; margin-top: 10px; }");
+        out.println(".checkbox-label { display: inline-block; font-weight: normal; margin-top: 0; margin-right: 20px; }");
         out.println(".use-case-desc { font-size: 0.9em; color: #555; margin-left: 20px; }");
+        out.println(".iframe-container { border: 2px solid #0c5460; margin: 20px 0; background: white; }");
+        out.println(".iframe-label { background: #d1ecf1; padding: 10px; font-weight: bold; color: #0c5460; }");
+        out.println("iframe { width: 100%; height: 600px; border: none; display: block; }");
         out.println("</style></head><body>");
 
         out.println("<h1>LTI Launch Test</h1>");
@@ -99,11 +107,17 @@ public class LaunchTestServlet extends HttpServlet {
         out.println("<option value='test-resource-link-002'" + (selectedUseCase.contains("unknown_assignment") ? " selected" : "") + ">test-resource-link-002 (unknown assignment)</option>");
         out.println("</select>");
 
+        out.println("<label for='testIframe' class='checkbox-label'>");
+        out.println("<input type='checkbox' name='testIframe' id='testIframe' value='true'" + (testIframe ? " checked" : "") + ">");
+        out.println("Test iframe rendering</label>");
+        out.println("<div class='use-case-desc'>Checks for iframe-blocking security headers and attempts to render response in an iframe</div>");
+
         out.println("<button type='submit'>Run Launch Test</button>");
         out.println("</form>");
 
         out.println("<div class='panel info'>");
         out.println("<strong>Pass logic:</strong> Must return HTTP 200 and valid HTML content. Response should contain course context and role-appropriate content.");
+        out.println("When iframe test is enabled: Also checks that iframe-blocking security headers are not present or properly configured.</strong>");
         out.println("</div>");
 
         if (result != null) {
@@ -114,6 +128,15 @@ public class LaunchTestServlet extends HttpServlet {
             out.println("<p><strong>Target:</strong> " + safe(result.getTargetUrl()) + "</p>");
             out.println("<p><strong>Completed:</strong> " + safe(String.valueOf(result.getCompletedAt())) + "</p>");
             out.println("<p><strong>Summary:</strong> " + safe(result.getSummary()) + "</p>");
+            
+            // Show iframe rendering if test iframe was enabled
+            if (testIframe && result.isPassedTest() && result.getResponseText() != null) {
+                out.println("<div class='iframe-container'>");
+                out.println("<div class='iframe-label'>Response Preview (iframe)</div>");
+                out.println("<iframe sandbox='allow-same-origin allow-scripts allow-forms allow-popups' srcdoc=\"" + escapeHtmlAttribute(result.getResponseText()) + "\"></iframe>");
+                out.println("</div>");
+            }
+            
             if (result.getDetails() != null) {
                 out.println("<div class='code'>" + escapeHtml(result.getDetails()) + "</div>");
             }
@@ -129,6 +152,8 @@ public class LaunchTestServlet extends HttpServlet {
         String role = trimToNull(req.getParameter("role"));
         String issuer = trimToNull(req.getParameter("issuer"));
         String resourceLinkId = trimToNull(req.getParameter("resourceLinkId"));
+        String testIframeParam = trimToNull(req.getParameter("testIframe"));
+        boolean testIframe = "true".equals(testIframeParam);
         String useCase = "instructor/known_assignment"; // default use case
 
         if (issuer == null) {
@@ -156,11 +181,11 @@ public class LaunchTestServlet extends HttpServlet {
         }
 
         result.setSuiteId(SUITE_ID);
-        result.setScenarioId("launch-" + useCase);
+        result.setScenarioId("launch-" + useCase + (testIframe ? "-iframe" : ""));
         result.setTargetUrl(targetUrl);
         Date startTime = new Date();
         result.setStartTime(startTime);
-        String debugDetails = "target=" + targetUrl + "\nuseCase=" + useCase + "\nissuer=" + issuer;
+        String debugDetails = "target=" + targetUrl + "\nuseCase=" + useCase + "\nissuer=" + issuer + "\ntestIframe=" + testIframe;
 
         try {
             LaunchScenarioDetails scenario = getLaunchScenarioDetails(useCase);
@@ -174,7 +199,8 @@ public class LaunchTestServlet extends HttpServlet {
                     idToken,
                     authTokenState.state,
                     authTokenState.redirectUrl,
-                    useCase);
+                    useCase,
+                    testIframe);
             
             result.setElapsedTime(new Date().getTime() - startTime.getTime());
             result.setResponseText(validation.responseBody);
@@ -192,7 +218,7 @@ public class LaunchTestServlet extends HttpServlet {
             result.save();
         }
 
-        resp.sendRedirect("/test/launch?target=" + ChemVantageTargets.labelFor(targetUrl) + "&useCase=" + useCase);
+        resp.sendRedirect("/test/launch?target=" + ChemVantageTargets.labelFor(targetUrl) + "&useCase=" + useCase + (testIframe ? "&testIframe=true" : ""));
     }
 
     private String buildLaunchJwt(String issuer, LaunchScenarioDetails scenario, String resourceLinkId) throws Exception {
@@ -270,7 +296,8 @@ public class LaunchTestServlet extends HttpServlet {
         String idToken,
         String state,
         String authRedirectUrl,
-        String useCase)
+        String useCase,
+        boolean testIframe)
     throws IOException {
         String endpointUrl = targetBaseUrl + "/lti/launch";
         HttpRequestFactory requestFactory = HTTP_TRANSPORT.createRequestFactory();
@@ -346,6 +373,16 @@ public class LaunchTestServlet extends HttpServlet {
                 + "Expected page text: \"" + expectedText + "\"\n"
                 + "Response length: " + body.length() + " characters\n"
                 + "Response preview: " + summarizeBody(body);
+        
+        // Check iframe compatibility if requested
+        if (testIframe) {
+            String xFrameOptions = getHeaderAsString(response.getHeaders().get("X-Frame-Options"));
+            String csp = getHeaderAsString(response.getHeaders().get("Content-Security-Policy"));
+            String iframeDetails = checkIframeCompatibility(xFrameOptions, csp);
+            details = details + "\n\nIFRAME TEST:\n" + iframeDetails;
+            summary = summary + " Iframe compatibility: " + (iframeDetails.contains("blocked") ? "BLOCKED" : "ALLOWED");
+        }
+        
         return new LaunchValidation(true, body, summary, details);
     }
 
@@ -526,6 +563,65 @@ public class LaunchTestServlet extends HttpServlet {
         return baseUrl;
     }
 
+    private String checkIframeCompatibility(String xFrameOptions, String csp) {
+        StringBuilder result = new StringBuilder();
+        
+        // Check X-Frame-Options header
+        result.append("X-Frame-Options: ");
+        if (xFrameOptions == null) {
+            result.append("NOT SET (ALLOWED)\n");
+        } else {
+            String upper = xFrameOptions.toUpperCase();
+            if ("DENY".equals(upper)) {
+                result.append("DENY - Iframe blocked\n");
+            } else if ("SAMEORIGIN".equals(upper)) {
+                result.append("SAMEORIGIN - Iframe allowed only from same origin\n");
+            } else if (upper.startsWith("ALLOW-FROM")) {
+                result.append(xFrameOptions).append(" - Iframe allowed only from specified origin\n");
+            } else {
+                result.append(xFrameOptions).append(" (unknown value)\n");
+            }
+        }
+        
+        // Check Content-Security-Policy frame-ancestors
+        result.append("Content-Security-Policy: ");
+        if (csp == null) {
+            result.append("NOT SET (ALLOWED)\n");
+        } else {
+            String lower = csp.toLowerCase();
+            if (lower.contains("frame-ancestors")) {
+                // Extract frame-ancestors directive
+                String frameAncestorsDir = "";
+                for (String directive : csp.split(";")) {
+                    if (directive.toLowerCase().contains("frame-ancestors")) {
+                        frameAncestorsDir = directive.trim();
+                        break;
+                    }
+                }
+                if (frameAncestorsDir.contains("'none'")) {
+                    result.append(frameAncestorsDir).append(" - Iframe blocked\n");
+                } else if (frameAncestorsDir.contains("'self'") || frameAncestorsDir.contains("*")) {
+                    result.append(frameAncestorsDir).append(" - Iframe allowed\n");
+                } else {
+                    result.append(frameAncestorsDir).append("\n");
+                }
+            } else {
+                result.append("NO frame-ancestors DIRECTIVE (ALLOWED by CSP)\n");
+            }
+        }
+        
+        // Overall assessment
+        result.append("\nIframe Compatibility: ");
+        if ((xFrameOptions == null || !xFrameOptions.toUpperCase().equals("DENY")) &&
+            (csp == null || !csp.toLowerCase().contains("frame-ancestors 'none'"))) {
+            result.append("ALLOWED - Can be embedded in iframe");
+        } else {
+            result.append("BLOCKED - Security headers prevent iframe embedding");
+        }
+        
+        return result.toString();
+    }
+
     private String safe(String value) {
         return value == null ? "N/A" : escapeHtml(value);
     }
@@ -536,6 +632,32 @@ public class LaunchTestServlet extends HttpServlet {
 
     private String escapeHtml(String value) {
         return value.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;");
+    }
+
+    private String escapeHtmlAttribute(String value) {
+        if (value == null) return "";
+        return value.replace("&", "&amp;")
+                   .replace("<", "&lt;")
+                   .replace(">", "&gt;")
+                   .replace("\"", "&quot;")
+                   .replace("'", "&#39;");
+    }
+
+    private String getHeaderAsString(Object headerValue) {
+        if (headerValue == null) {
+            return null;
+        }
+        if (headerValue instanceof String) {
+            return (String) headerValue;
+        }
+        if (headerValue instanceof List) {
+            List<?> list = (List<?>) headerValue;
+            if (list.isEmpty()) {
+                return null;
+            }
+            return list.get(0).toString();
+        }
+        return headerValue.toString();
     }
 
     private static final class LaunchValidation {

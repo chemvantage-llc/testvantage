@@ -193,11 +193,11 @@ public class TestSuiteServlet extends HttpServlet {
             triggerTestViaPost(baseUrl + "/test/registration", "target", "prod", "lms", "canvas");
             triggerTestViaPost(baseUrl + "/test/registration", "target", "prod", "lms", "moodle");
 
-            // Launch tests: 4 variations
-            triggerTestViaPost(baseUrl + "/test/launch", "target", "prod", "role", "instructor", "resourceLinkId", "test-resource-link-001", "issuer", baseUrl);
-            triggerTestViaPost(baseUrl + "/test/launch", "target", "prod", "role", "instructor", "resourceLinkId", "test-resource-link-002", "issuer", baseUrl);
-            triggerTestViaPost(baseUrl + "/test/launch", "target", "prod", "role", "student", "resourceLinkId", "test-resource-link-001", "issuer", baseUrl);
-            triggerTestViaPost(baseUrl + "/test/launch", "target", "prod", "role", "student", "resourceLinkId", "test-resource-link-002", "issuer", baseUrl);
+            // Launch tests: 4 variations (with iframe compatibility test enabled)
+            triggerTestViaPost(baseUrl + "/test/launch", "target", "prod", "role", "instructor", "resourceLinkId", "test-resource-link-001", "issuer", baseUrl, "testIframe", "true");
+            triggerTestViaPost(baseUrl + "/test/launch", "target", "prod", "role", "instructor", "resourceLinkId", "test-resource-link-002", "issuer", baseUrl, "testIframe", "true");
+            triggerTestViaPost(baseUrl + "/test/launch", "target", "prod", "role", "student", "resourceLinkId", "test-resource-link-001", "issuer", baseUrl, "testIframe", "true");
+            triggerTestViaPost(baseUrl + "/test/launch", "target", "prod", "role", "student", "resourceLinkId", "test-resource-link-002", "issuer", baseUrl, "testIframe", "true");
 
             // Auth token test
             triggerTestViaPost(baseUrl + "/test/auth-token", "target", "prod", "issuer", baseUrl, "deploymentId", "test-vantage-deployment-001", "launchType", "launch");
